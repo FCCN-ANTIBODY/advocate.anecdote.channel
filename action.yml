@@ -28,6 +28,12 @@ inputs:
     description: "ANTHROPIC_API_KEY for the session agent. Pass a secret. Blank => stage and stop."
     required: false
     default: ""
+  workspace-id:
+    description: >
+      Anthropic workspace id, required only when the key is identity-linked (the API says so
+      by name if it is). Not a secret — a routing id, fine in a repo/org variable.
+    required: false
+    default: ""
   agent-cmd:
     description: >
       Override the agent behind the session (ADVOCATE_AGENT_CMD). Any command honoring the
@@ -70,6 +76,7 @@ runs:
       shell: bash
       env:
         ADVOCATE_AGENT_KEY: ${{ inputs.agent-key }}
+        ANTHROPIC_WORKSPACE_ID: ${{ inputs.workspace-id }}
         ADVOCATE_AGENT_CMD: ${{ inputs.agent-cmd }}
         ADVOCATE_PUSH: ${{ inputs.push }}
         ADVOCATE_METHOD: ${{ github.action_path }}/METHOD.md

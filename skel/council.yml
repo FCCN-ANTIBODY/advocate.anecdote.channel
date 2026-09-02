@@ -60,3 +60,5 @@ jobs:
           # An FCCN-ANTIBODY org secret; ANTHROPIC_API_KEY is the fallback name judgement
           # uses. Blank => the session stages for a human and is never faked.
           agent-key: ${{ secrets.ADVOCATE_AGENT_KEY || secrets.ANTHROPIC_API_KEY }}
+          # Only needed when the key is identity-linked. Not a secret; a variable is fine.
+          workspace-id: ${{ vars.ADVOCATE_WORKSPACE_ID }}

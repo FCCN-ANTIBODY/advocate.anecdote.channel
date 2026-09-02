@@ -15,6 +15,9 @@
 #
 # Credentials + model (override to taste):
 #   ANTHROPIC_API_KEY   required to run; absent => --available fails => run.sh stages it.
+#   ANTHROPIC_WORKSPACE_ID  required IFF the key is identity-linked, which the API tells you
+#                       plainly ("anthropic-workspace-id is required..."). Not a secret — a
+#                       routing id. Sent only when set, so a plain key needs nothing.
 #   ADVOCATE_MODEL      default claude-opus-5.
 #   ADVOCATE_EFFORT     default high.
 #   ADVOCATE_API_URL    default https://api.anthropic.com/v1/messages.
@@ -24,6 +27,7 @@ api_key="${ANTHROPIC_API_KEY:-}"
 model="${ADVOCATE_MODEL:-claude-opus-5}"
 effort="${ADVOCATE_EFFORT:-high}"
 url="${ADVOCATE_API_URL:-https://api.anthropic.com/v1/messages}"
+workspace="${ANTHROPIC_WORKSPACE_ID:-${ADVOCATE_WORKSPACE_ID:-}}"
 
 if [ "${1:-}" = "--available" ]; then
   [ -n "$api_key" ] && exit 0 || exit 1
@@ -69,11 +73,15 @@ body="$(jq -n --arg model "$model" --arg system "$system" --arg effort "$effort"
     ) } ]
   }')"
 
+wsargs=()
+[ -n "$workspace" ] && wsargs=(-H "anthropic-workspace-id: $workspace")
+
 response="$(printf '%s' "$body" | curl -sS "$url" \
   -H "content-type: application/json" \
   -H "x-api-key: $api_key" \
   -H "anthropic-version: 2023-06-01" \
   -H "anthropic-beta: server-side-fallback-2026-07-01" \
+  "${wsargs[@]}" \
   --data-binary @- )"
 
 if [ "$(printf '%s' "$response" | jq -r '.type // ""')" = "error" ]; then
