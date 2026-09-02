@@ -78,6 +78,20 @@ If you would rather GitHub never act, drop the `schedule:` trigger from `council
 being the thing that fires it, which is the posture the rest of this constellation already takes
 with its dormant crons.
 
+## What a `hosted` seat actually costs you
+
+Verified against a real, correctly-configured credential on 2026-09-02: the request authenticated,
+resolved its workspace, and came back
+
+> `Your credit balance is too low to access the Anthropic API.`
+
+Which is the point stated plainly by the API itself — **a hosted seat spends money every week, per
+advocate, forever.** The framework degrades exactly as designed (the session went `staged` and left
+its work order), so nothing was lost; but there is no version of `hosted` that is free, and a
+council of several seats across several repos multiplies it.
+
+`local` costs nothing and sends nothing. Reach for `hosted` only where unattended really matters.
+
 ## If you do turn a seat `hosted`
 
 Two values, and the second one is easy to misread:

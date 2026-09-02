@@ -27,12 +27,7 @@ jobs:
     # `secrets` is not an allowed context in a step `if:` — it has to arrive as env first.
     env:
       AGENT_KEY: ${{ secrets.ADVOCATE_AGENT_KEY || secrets.ANTHROPIC_API_KEY }}
-      ALT_CLAUDE_KEY: ${{ secrets.CLAUDE_API_KEY }}
-      ALT_ADVOCATE_KEY: ${{ secrets.ADVOCATE_AGENT_KEY }}
-      # The workspace id's label is whatever it was typed as. Try the likely names, in both
-      # contexts, and report which one answered — a variable is not readable over the API, so
-      # the runner is the only place that can tell us.
-      WORKSPACE_ID: ${{ vars.ADVOCATE_WORKSPACE_ID || vars.ANTHROPIC_WORKSPACE_ID || vars.ADVOCATE_AGENT_WORKSPACE || vars.ADVOCATE_WORKSPACE || vars.ANTHROPIC_WORKSPACE || vars.WORKSPACE_ID || secrets.ADVOCATE_WORKSPACE_ID || secrets.ANTHROPIC_WORKSPACE_ID || secrets.ADVOCATE_AGENT_WORKSPACE || secrets.ADVOCATE_WORKSPACE || secrets.ANTHROPIC_WORKSPACE || secrets.WORKSPACE_ID }}
+      WORKSPACE_ID: ${{ vars.ADVOCATE_WORKSPACE_ID }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -92,9 +87,7 @@ jobs:
       - name: Which agent credential is visible here
         run: |
           present() { if [ -n "$1" ]; then echo yes; else echo no; fi; }
-          echo "resolved agent key  present: $(present "$AGENT_KEY")"
-          echo "CLAUDE_API_KEY     present: $(present "$ALT_CLAUDE_KEY")"
-          echo "ADVOCATE_AGENT_KEY present: $(present "$ALT_ADVOCATE_KEY")"
+          echo "agent key    present: $(present "$AGENT_KEY")"
           echo "workspace id present: $(present "$WORKSPACE_ID")"
           # The value matters as much as the label: this is the ANTHROPIC workspace
           # (wrkspc_...), not a GitHub org. Say so here rather than in an API error.
