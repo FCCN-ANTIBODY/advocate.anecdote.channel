@@ -29,5 +29,7 @@ repository, it belongs in *that* repository's `advocate.yml`, not here.
 
 ## Tests
 
-`npm test` — `node test/*.test.mjs`. **Zero dependencies, on purpose**; `bin/yaml-enough.mjs` is the
+`npm test` — `node test/*.test.mjs`. The selftest workflow drives the action end to end, and
+**walks the local path only**: the hosted path costs real money on every run, so it is gated behind
+the variable `ADVOCATE_SELFTEST_HOSTED=true` and is walked on purpose or not at all. **Zero dependencies, on purpose**; `bin/yaml-enough.mjs` is the
 subset of YAML a config is allowed to be, in the house `*-enough` idiom.

@@ -45,9 +45,10 @@ advocates:
       - Anything that needs a second repository in the checkout.
 
   - name: legibility
-    # hosted: opt in to running unattended over the API, at cost, with the repository's
-    # contents leaving for an inference provider. Never the default; always a decision.
-    session: hosted
+    # Also local. `session: hosted` would run this unattended over the API — at cost, every
+    # week, forever, with the repository's contents leaving for an inference provider. It is
+    # a real capability and it is proven to work; it is simply not what this ships as.
+    session: local
     mission: Could the next operator copy this and understand what they copied?
     cadence: weekly
     writes: []                    # NOT WIRED YET — a non-empty grant is refused until the

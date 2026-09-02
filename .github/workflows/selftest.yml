@@ -28,6 +28,9 @@ jobs:
     env:
       AGENT_KEY: ${{ secrets.ADVOCATE_AGENT_KEY || secrets.ANTHROPIC_API_KEY }}
       WORKSPACE_ID: ${{ vars.ADVOCATE_WORKSPACE_ID }}
+      # The hosted path is proven and costs real money, so CI does not walk it by default.
+      # Set the repo/org variable ADVOCATE_SELFTEST_HOSTED=true to exercise it deliberately.
+      RUN_HOSTED: ${{ vars.ADVOCATE_SELFTEST_HOSTED }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -94,11 +97,33 @@ jobs:
           if [ -n "$WORKSPACE_ID" ] && [ "${WORKSPACE_ID#wrkspc_}" = "$WORKSPACE_ID" ]; then
             echo "::warning::the workspace id is set but is not an Anthropic workspace id (expected wrkspc_01...) — hosted sessions will stay staged"
           fi
+          echo "hosted path this run: ${RUN_HOSTED:-false} (set ADVOCATE_SELFTEST_HOSTED=true to spend credits on purpose)"
 
-      # A real session, only when a credential is actually reachable. `legibility` has never
-      # run, so this is a first session and must come back `seated` with an opening position.
+      - name: Both shipped seats stay local
+        run: |
+          node bin/seats.mjs --matrix | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+            const m=JSON.parse(s).include, bad=m.filter(x=>x.session!=="local");
+            if(bad.length){ console.error("a shipped seat is hosted:", bad.map(x=>x.name).join(", ")); process.exit(1); }
+            console.log("all shipped seats local:", m.map(x=>x.name).join(", "));
+          })'
+
+      # The hosted path costs money on every run, so it is walked only on purpose. Seating a
+      # hosted advocate here rather than in the shipped example keeps the default free.
+      - name: Opt in to the hosted path
+        if: env.AGENT_KEY != '' && env.RUN_HOSTED == 'true'
+        run: |
+          node -e '
+            const fs = require("fs");
+            const f = "advocate.yml";
+            const out = fs.readFileSync(f, "utf8").replace(/(- name: legibility\n)/, "$1    session: hosted\n");
+            if (out === fs.readFileSync(f, "utf8")) { console.error("could not seat a hosted advocate"); process.exit(1); }
+            fs.writeFileSync(f, out);
+          '
+          node bin/seats.mjs --seat legibility | grep -q '"session": "hosted"' || { echo "legibility is not hosted"; exit 1; }
+
+      # `legibility` has never run, so this is a first session and must come back `seated`.
       - id: live
-        if: env.AGENT_KEY != ''
+        if: env.AGENT_KEY != '' && env.RUN_HOSTED == 'true'
         continue-on-error: true    # a half-configured credential warns; it does not fail the suite
         uses: ./
         with:
@@ -108,7 +133,7 @@ jobs:
           push: "false"
 
       - name: The live session was seated and wrote real files
-        if: env.AGENT_KEY != ''
+        if: env.AGENT_KEY != '' && env.RUN_HOSTED == 'true'
         run: |
           status="${{ steps.live.outputs.status }}"
           # `staged` here means the credential could not complete a session — the honest
