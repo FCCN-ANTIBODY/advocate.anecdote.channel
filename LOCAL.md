@@ -91,3 +91,22 @@ The second is needed only when the key is identity-linked, and it is the **Anthr
 not a GitHub org or repository. "Workspace" means three separate things in this stack (the Actions
 checkout, the advocate's branch, and the Anthropic one), so `bin/advocate-agent` refuses a value
 that is obviously not an id rather than spending a call to be told.
+
+**The easiest version of this is not to need it.** A **workspace-scoped API key** carries its own
+workspace, requires no header, and lets you delete the variable entirely. Only an *identity-linked*
+key demands the id — so if the Console will not let you copy the string, change the key instead of
+fighting the string.
+
+If you do want the id and the Console truncates it on screen, read it where nothing truncates:
+
+```sh
+brew install anthropics/tap/ant
+xattr -d com.apple.quarantine "$(brew --prefix)/bin/ant"
+ant auth login                    # a browser picker — click the workspace, never retype it
+ant auth status                   # reports the active workspace
+cat "${ANTHROPIC_CONFIG_DIR:-$HOME/.config/anthropic}"/configs/*.json
+```
+
+The picker means you select the workspace **by name** and the id lands in a JSON file you can
+`cat`. The Console URL carries it too — `platform.claude.com/workspaces/<id>/…` — so copying the
+address bar beats selecting the truncated text.

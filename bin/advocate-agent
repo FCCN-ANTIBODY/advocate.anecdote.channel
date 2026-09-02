@@ -35,8 +35,12 @@ workspace="${ANTHROPIC_WORKSPACE_ID:-${ADVOCATE_WORKSPACE_ID:-}}"
 # an id (wrkspc_...), never an org or repository name. Catch the mix-up locally instead of
 # spending a call to be told.
 if [ -n "$workspace" ] && [ "${workspace#wrkspc_}" = "$workspace" ]; then
-  echo "advocate-agent: '$workspace' is not an Anthropic workspace id — those look like 'wrkspc_01...'." >&2
-  echo "advocate-agent: this is the workspace the API KEY acts in, from the Anthropic Console, not a GitHub org or repo." >&2
+  echo "advocate-agent: '$workspace' is not an Anthropic workspace id (those look like 'wrkspc_01...')." >&2
+  echo "advocate-agent: EASIEST FIX — don't have one. A workspace-scoped API key carries its own" >&2
+  echo "advocate-agent:   workspace, needs no header at all, and lets you delete this setting." >&2
+  echo "advocate-agent:   Only an identity-linked key requires the id." >&2
+  echo "advocate-agent: If you do need the id and the Console truncates it, read it in a terminal:" >&2
+  echo "advocate-agent:   ant auth login && cat \"\${ANTHROPIC_CONFIG_DIR:-\$HOME/.config/anthropic}\"/configs/*.json" >&2
   exit 1
 fi
 
