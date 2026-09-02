@@ -68,7 +68,10 @@ fi
 export ANTHROPIC_API_KEY="${ADVOCATE_AGENT_KEY:-${ANTHROPIC_API_KEY:-}}"
 cmd="${ADVOCATE_AGENT_CMD:-$here/bin/advocate-agent}"
 
-if ! $cmd --available >/dev/null 2>&1; then
+if ! why="$($cmd --available 2>&1 >/dev/null)"; then
+  # Say WHY it is unavailable. A silent "no agent" sends someone hunting for a missing key
+  # when the adapter already knows the answer (bad workspace id, no credential, ...).
+  [ -n "$why" ] && echo "advocate: no session — $why"
   node "$here/bin/order.mjs" "$name" "$work" "$session" "$here"
   if [ "$first" = "true" ]; then
     commit_and_push "$name: seated at $(git rev-parse --short "$ref") — no agent available"
