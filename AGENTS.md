@@ -6,6 +6,7 @@ repository, it belongs in *that* repository's `advocate.yml`, not here.
 
 | Your question | The one file |
 | --- | --- |
+| What do `draft` / `ready` / `promoted` mean? | [`STATUS.md`](STATUS.md) — one ladder, and why drafting early is safe |
 | What is an advocate supposed to do? | [`METHOD.md`](METHOD.md) — the whole loop, written to hand to an agent |
 | What does the config look like? | [`advocate.example.yml`](advocate.example.yml) |
 | How do I run it without an API, or without cost? | [`LOCAL.md`](LOCAL.md) — the default path, and the routine prompt |

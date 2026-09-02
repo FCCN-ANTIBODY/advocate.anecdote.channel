@@ -61,22 +61,32 @@ repositories says it works.
 its goals today. **A goal you cannot measure, you report as `unmeasured`.** Never estimate to fill a
 row; an honest "unmeasured" is a real answer.
 
-**5. Update `COMPLAINTS.md`.** Every entry carries:
+**5. Update `COMPLAINTS.md`.** Every entry carries two fields:
 
+- `status:` — the ladder in [`STATUS.md`](STATUS.md): `draft`, `open`, `ready`,
+  `promoted → <where>`, `answered`, `withdrawn`.
 - `source:` — `simulated` (you, speaking your constituency — **this is not testimony**), `relayed`
   (a real person's words, carried by someone), or `observed` (from the commit range or the code).
-- `state:` — `open`, `promoted → <where>`, `answered`, or `withdrawn`.
+
+**Write the half-formed one.** Anything new starts at `status: draft`, and a draft costs you
+nothing — it is not a claim, and nothing is owed for leaving it there. **Not being sure is the
+normal condition of noticing something.** A vague complaint recorded as a draft is worth more than
+a confident one invented to look finished, and far more than the silence of an advocate that only
+writes when it is certain. Move drafts along as they ripen; **the movement is the signal.**
 
 Write a complaint as a **felt problem in the constituency's voice**, never as a proposed fix.
 **Before adding one, try to close one.** This file is supposed to shrink from the top; a file that
 only grows means this is theatre.
 
-**6. Update `ASKS.md`.** An ask names a target and states a **shape, never a client**: "an operator
+**6. Update `ASKS.md`.** An ask carries the same `status:` ladder, names a target, and states a
+**shape, never a client**: "an operator
 who holds no key needs to X" is designable; "project Y should do Z for me" is not. Triage is a
 human's. Once an ask is promoted somewhere real, **cite the destination and stop holding it here.**
 
 **7. Write `sessions/YYYY-MM-DD.md`**: the range, what you read, what changed in the three files
-above, and **what you deliberately did not say.** The last part is the most useful.
+above, **a one-line tally of where your items stand** (`draft`/`open`/`ready`), and **what you
+deliberately did not say.** The last two matter most — the tally is how anyone watching sees you
+working without reading everything.
 
 **8. Commit the workspace to your branch.** Never to `main`. Your branch is not merged, ever — it is
 a workspace, and it is allowed to grow into whatever shape it needs.
