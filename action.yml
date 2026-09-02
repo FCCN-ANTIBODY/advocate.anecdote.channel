@@ -1,0 +1,66 @@
+name: "advocate"
+description: >
+  Run one advocate's caretaking session against the repository that mounts this action.
+
+  An advocate speaks for a constituency about what it takes to KEEP THIS RUNNING — not the
+  correctness of the build, not the content published. It reads the first-parent commits merged
+  since its last session, holds them against a mission (and, where the repo has one, a constitution
+  or a named section of it), and keeps its whole workspace on its own branch. `main` never learns
+  about it.
+
+  The DATA — mission, constituency, voice, goals, grants — is the CALLER's, in a single root-level
+  `advocate.yml`. The CODE here is the loop, the refusals, and the branch discipline.
+
+  Two honest failures, both quiet. An EMPTY RANGE writes one line and stops: an advocate that
+  manufactures opinion because a schedule fired is worse than one that never ran. NO AGENT
+  CREDENTIAL prepares the workspace, records what moved, and stops there — the session is staged
+  for a human, never faked.
+
+inputs:
+  advocate:
+    description: "Which advocate in advocate.yml to run. Required."
+    required: true
+  subject-ref:
+    description: "The ref to read. Default HEAD of the checkout."
+    required: false
+    default: "HEAD"
+  agent-key:
+    description: "ANTHROPIC_API_KEY for the session agent. Pass a secret. Blank => stage and stop."
+    required: false
+    default: ""
+  agent-cmd:
+    description: "Override the agent behind the session (ADVOCATE_AGENT_CMD). Blank => the bundled one."
+    required: false
+    default: ""
+  push:
+    description: "Push the advocate's branch when the session produced anything. Default true."
+    required: false
+    default: "true"
+
+outputs:
+  status:
+    description: "quiet (nothing merged) | staged (no credential) | spoke (the workspace changed)"
+    value: ${{ steps.run.outputs.status }}
+  branch:
+    description: "The advocate's branch."
+    value: ${{ steps.run.outputs.branch }}
+  commits:
+    description: "How many commits were in the range."
+    value: ${{ steps.run.outputs.commits }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate advocate.yml
+      shell: bash
+      run: node "$GITHUB_ACTION_PATH/bin/seats.mjs" --seat "${{ inputs.advocate }}" > /dev/null
+
+    - name: Prepare the workspace and read the range
+      id: run
+      shell: bash
+      env:
+        ADVOCATE_AGENT_KEY: ${{ inputs.agent-key }}
+        ADVOCATE_AGENT_CMD: ${{ inputs.agent-cmd }}
+        ADVOCATE_PUSH: ${{ inputs.push }}
+        ADVOCATE_METHOD: ${{ github.action_path }}/METHOD.md
+      run: bash "$GITHUB_ACTION_PATH/run.sh" "${{ inputs.advocate }}" "${{ inputs.subject-ref }}"

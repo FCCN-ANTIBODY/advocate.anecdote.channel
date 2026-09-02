@@ -1,0 +1,62 @@
+# .github/workflows/council.yml — copy this into the repository being cared for.
+#
+# One job per advocate in advocate.yml, from one matrix. Adding an advocate is a config
+# change, never a new workflow.
+#
+# TRIGGERS ARE schedule AND workflow_dispatch ONLY, on purpose. Never add
+# `pull_request_target`: an outside advocate's branch is READ, never RUN. Their credibility
+# comes from you reading their reasoning, not from your CI executing their tree with your
+# secrets.
+
+name: council
+
+on:
+  schedule:
+    - cron: "0 13 * * 1"   # Mondays. Your cadence; change it.
+  workflow_dispatch:
+    inputs:
+      advocate:
+        description: "Run just this one (blank = all of them)"
+        required: false
+
+permissions:
+  contents: write          # advocates push their own branch, and nothing else
+
+concurrency:
+  group: council-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  seats:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.read.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: FCCN-ANTIBODY/advocate.anecdote.channel
+          path: .advocate-engine
+      - id: read
+        run: echo "matrix=$(node .advocate-engine/bin/seats.mjs --matrix)" >> "$GITHUB_OUTPUT"
+
+  session:
+    needs: seats
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.seats.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # the range is the input; shallow hides it
+      - uses: actions/checkout@v4
+        with:
+          repository: FCCN-ANTIBODY/advocate.anecdote.channel
+          path: .advocate-engine
+
+      - if: ${{ github.event.inputs.advocate == '' || github.event.inputs.advocate == matrix.name }}
+        uses: ./.advocate-engine
+        with:
+          advocate: ${{ matrix.name }}
+          agent-key: ${{ secrets.ADVOCATE_AGENT_KEY }}   # blank => stage for a human, never fake
