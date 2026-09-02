@@ -110,10 +110,17 @@ printf '%s' "$raw" | jq -r '.asks'       > "$work/ASKS.md"
 printf '%s' "$raw" | jq -r '.session'    > "$work/sessions/$(date -u +%Y-%m-%d).md"
 rm -f "$work/sessions/PENDING.md" "$work/sessions/.pending.json"
 
+# Resolution for whoever is watching: how much is still forming, and how much is asking to move.
+# Drafts are progress, not debt — surfacing them is the point (STATUS.md).
+drafts=$(grep -rho 'status: draft' "$work" 2>/dev/null | wc -l | tr -d ' ')
+ready=$(grep -rho 'status: ready' "$work" 2>/dev/null | wc -l | tr -d ' ')
+out drafts "$drafts"
+out ready "$ready"
+
 if [ "$first" = "true" ]; then
-  commit_and_push "$name: seated $(date -u +%Y-%m-%d) — opening position"
+  commit_and_push "$name: seated $(date -u +%Y-%m-%d) — opening position ($drafts draft(s))"
   out status seated
 else
-  commit_and_push "$name: session $(date -u +%Y-%m-%d) — $count commit(s) read"
+  commit_and_push "$name: session $(date -u +%Y-%m-%d) — $count commit(s) read, $drafts draft(s), $ready ready"
   out status spoke
 fi
