@@ -24,6 +24,11 @@ jobs:
 
   action:
     runs-on: ubuntu-latest
+    # `secrets` is not an allowed context in a step `if:` — it has to arrive as env first.
+    env:
+      AGENT_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ALT_CLAUDE_KEY: ${{ secrets.CLAUDE_API_KEY }}
+      ALT_ADVOCATE_KEY: ${{ secrets.ADVOCATE_AGENT_KEY }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -77,14 +82,15 @@ jobs:
 
       - name: Which agent credential is visible here
         run: |
-          echo "ANTHROPIC_API_KEY present: ${{ secrets.ANTHROPIC_API_KEY != '' }}"
-          echo "CLAUDE_API_KEY    present: ${{ secrets.CLAUDE_API_KEY != '' }}"
-          echo "ADVOCATE_AGENT_KEY present: ${{ secrets.ADVOCATE_AGENT_KEY != '' }}"
+          present() { if [ -n "$1" ]; then echo yes; else echo no; fi; }
+          echo "ANTHROPIC_API_KEY  present: $(present "$AGENT_KEY")"
+          echo "CLAUDE_API_KEY     present: $(present "$ALT_CLAUDE_KEY")"
+          echo "ADVOCATE_AGENT_KEY present: $(present "$ALT_ADVOCATE_KEY")"
 
       # A real session, only when a credential is actually reachable. `legibility` has never
       # run, so this is a first session and must come back `seated` with an opening position.
       - id: live
-        if: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        if: env.AGENT_KEY != ''
         uses: ./
         with:
           advocate: legibility
@@ -92,13 +98,13 @@ jobs:
           push: "false"
 
       - name: The live session was seated and wrote real files
-        if: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        if: env.AGENT_KEY != ''
         run: |
           test "${{ steps.live.outputs.status }}" = "seated" \
             || { echo "expected status=seated, got '${{ steps.live.outputs.status }}'"; exit 1; }
           for f in POSITION.md COMPLAINTS.md ASKS.md; do
             git cat-file -e "advocate/legibility:$f" || { echo "missing $f"; exit 1; }
-            test -s <(git show "advocate/legibility:$f") || { echo "$f is empty"; exit 1; }
+            test "$(git show "advocate/legibility:$f" | wc -c)" -gt 100 || { echo "$f is empty"; exit 1; }
           done
           echo "--- POSITION.md ---"; git show advocate/legibility:POSITION.md
           echo "--- sessions ---";    git ls-tree -r --name-only advocate/legibility
