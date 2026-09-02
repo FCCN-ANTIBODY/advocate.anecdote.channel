@@ -1,0 +1,80 @@
+# The framework proving itself: unit tests, then the action driven end to end against this
+# very repository as its own subject. Nothing is pushed and no credential is used — the run
+# asserts the two HONEST FAILURES, which are the paths a scheduled council actually takes
+# most weeks.
+
+name: selftest
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm test
+
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # the range is the input; shallow hides it
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+
+      - name: Seat a scratch advocate on this repo
+        run: cp advocate.example.yml advocate.yml
+
+      # No agent-key: the session must STAGE for a human, never fabricate one.
+      - id: first
+        uses: ./
+        with:
+          advocate: upkeep
+          push: "false"
+
+      - name: The first run staged the range
+        run: |
+          test "${{ steps.first.outputs.status }}" = "staged" \
+            || { echo "expected status=staged, got '${{ steps.first.outputs.status }}'"; exit 1; }
+          test "${{ steps.first.outputs.branch }}" = "advocate/upkeep" \
+            || { echo "expected branch=advocate/upkeep, got '${{ steps.first.outputs.branch }}'"; exit 1; }
+          git rev-parse --verify advocate/upkeep >/dev/null
+          git show advocate/upkeep:state.json
+          git ls-tree -r --name-only advocate/upkeep
+
+      - name: The workspace is an orphan and main never learned about it
+        run: |
+          test -z "$(git log --format=%P -1 advocate/upkeep)" \
+            || { echo "advocate/upkeep is not an orphan"; exit 1; }
+          git merge-base --is-ancestor advocate/upkeep HEAD 2>/dev/null \
+            && { echo "advocate branch is reachable from main"; exit 1; }
+          test -z "$(git status --porcelain -- ':!advocate.yml')" \
+            || { echo "the subject tree was left dirty:"; git status --porcelain; exit 1; }
+
+      # Nothing has merged since the first run, so this one must go quiet.
+      - id: second
+        uses: ./
+        with:
+          advocate: upkeep
+          push: "false"
+
+      - name: The second run went quiet
+        run: |
+          test "${{ steps.second.outputs.status }}" = "quiet" \
+            || { echo "expected status=quiet, got '${{ steps.second.outputs.status }}'"; exit 1; }
+          git show "advocate/upkeep:sessions/$(date -u +%Y-%m-%d).md"
+
+      - name: A config that cannot be read stops the council
+        run: |
+          printf 'version: 1\nadvocates:\n  - name: a\n    mission: m\n' > advocate.yml
+          if node bin/seats.mjs --seat a; then echo "should have refused"; exit 1; fi
+          echo "refused, as it should"

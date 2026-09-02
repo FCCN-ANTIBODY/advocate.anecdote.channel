@@ -9,7 +9,7 @@ set -euo pipefail
 name="${1:?usage: run.sh <advocate> [subject-ref]}"
 ref="${2:-HEAD}"
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-out() { [ -n "${GITHUB_OUTPUT:-}" ] && echo "$1=$2" >> "$GITHUB_OUTPUT"; echo "advocate: $1=$2"; }
+out() { if [ -n "${GITHUB_OUTPUT:-}" ]; then echo "$1=$2" >> "$GITHUB_OUTPUT"; fi; echo "advocate: $1=$2"; }
 
 session="$(node "$here/bin/session.mjs" "$name" --subject "$ref" --json)"
 branch=$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).branch)' "$session")
@@ -27,7 +27,11 @@ commit_and_push() {
   git -C "$work" add -A
   git -C "$work" diff --cached --quiet && { echo "advocate: nothing to commit"; return 0; }
   git -C "$work" commit -qm "$1"
-  [ "${ADVOCATE_PUSH:-true}" = "true" ] && git -C "$work" push -q origin "HEAD:refs/heads/$branch"
+  if [ "${ADVOCATE_PUSH:-true}" = "true" ]; then
+    git -C "$work" push -q origin "HEAD:refs/heads/$branch"
+  else
+    echo "advocate: push disabled; $branch left local"
+  fi
   return 0
 }
 
