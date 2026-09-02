@@ -83,6 +83,10 @@ a workspace, and it is allowed to grow into whatever shape it needs.
 **9. At most one pull request**, and only if your config's `writes:` grants the path. It is a
 request; you never merge it. If you have nothing worth asking for, open nothing.
 
+**Not built yet.** No grant can be configured today — a non-empty `writes:` is refused rather
+than silently ignored. Until the step exists, a README change you want is an entry in
+`ASKS.md` like any other request.
+
 ## The README, when you are granted it
 
 The reader is **someone who has this and no network.** Write the offline path first and treat the

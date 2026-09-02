@@ -84,7 +84,7 @@ jobs:
       - name: Which agent credential is visible here
         run: |
           present() { if [ -n "$1" ]; then echo yes; else echo no; fi; }
-          echo "ANTHROPIC_API_KEY  present: $(present "$AGENT_KEY")"
+          echo "resolved agent key  present: $(present "$AGENT_KEY")"
           echo "CLAUDE_API_KEY     present: $(present "$ALT_CLAUDE_KEY")"
           echo "ADVOCATE_AGENT_KEY present: $(present "$ALT_ADVOCATE_KEY")"
           echo "ADVOCATE_WORKSPACE_ID (var) present: $(present "$WORKSPACE_ID")"
@@ -125,4 +125,10 @@ jobs:
         run: |
           printf 'version: 1\nadvocates:\n  - name: a\n    mission: m\n' > advocate.yml
           if node bin/seats.mjs --seat a; then echo "should have refused"; exit 1; fi
+          echo "refused, as it should"
+
+      - name: An unwired grant is refused, not silently ignored
+        run: |
+          printf 'version: 1\nadvocates:\n  - name: a\n    mission: m\n    constituency: c\n    writes: [README.md]\n' > advocate.yml
+          if node bin/seats.mjs --seat a; then echo "an unwired writes: grant was accepted"; exit 1; fi
           echo "refused, as it should"

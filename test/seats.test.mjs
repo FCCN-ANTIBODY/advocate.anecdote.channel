@@ -41,6 +41,8 @@ const refusals = [
   ['version: 1\nadvocates:\n  - name: a\n    mission: m\n', /no constituency/],
   ['version: 1\nadvocates:\n  - name: a\n    constituency: c\n', /no mission/],
   [`version: 1\nadvocates:\n  - name: a\n    mission: m\n    constituency: c\n  - name: a\n    mission: m\n    constituency: c\n`, /duplicate/],
+  // A grant that cannot act must not parse as though it can.
+  ['version: 1\nadvocates:\n  - name: a\n    mission: m\n    constituency: c\n    writes: [README.md]\n', /not wired yet/],
 ];
 for (const [yaml, re] of refusals) {
   const r = run(yaml);

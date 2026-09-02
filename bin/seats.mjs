@@ -45,6 +45,12 @@ export function loadConfig(root = process.cwd()) {
     }
     const writes = a.writes == null ? [] : a.writes;
     if (!Array.isArray(writes)) die(`${where}: ${a.name}: writes must be a list (use [] for none)`);
+    // The grant parses, but nothing acts on it yet: the pull-request step is unbuilt. A key
+    // that reads as a capability and quietly does nothing is the failure this whole file is
+    // written against, so refuse it until the step exists.
+    if (writes.length) {
+      die(`${where}: ${a.name}: writes: is not wired yet — the pull-request step is unbuilt. Use [] until it is.`);
+    }
     return {
       ...a,
       branch: a.branch || `advocate/${a.name}`,

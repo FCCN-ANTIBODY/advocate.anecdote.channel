@@ -45,7 +45,9 @@ advocates:
   - name: legibility
     mission: Could the next operator copy this and understand what they copied?
     cadence: weekly
-    writes: [README.md]           # a grant, not an inherent power; still only ever a PR
+    writes: []                    # NOT WIRED YET — a non-empty grant is refused until the
+                                  # pull-request step exists. It is a grant, never an
+                                  # inherent power, and only ever a PR when it lands.
     constituency: |
       Someone who has just received this and is not online. They have the files and no one
       to ask.
