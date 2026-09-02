@@ -97,6 +97,30 @@ place.
 `workflow_dispatch` only — never `pull_request_target`, which would hand a stranger's tree your
 secrets. A guest holds no `writes:` grant by construction, because grants live in *your* config.
 
+## No API by default — the path is declared, not inferred
+
+```yaml
+advocates:
+  - name: upkeep
+    session: local     # the default: prepare the work, never call out
+```
+
+`local` prepares everything mechanical — pin, range, branch — and leaves the judgement half as a
+**work order** at `sessions/PENDING.md` on the advocate's own branch. **The branch is the queue.**
+A local agent, a desktop routine, or a person picks it up:
+
+```sh
+node .advocate-engine/bin/pending.mjs        # what is owed
+node .advocate-engine/bin/session.mjs upkeep # enter one workspace
+```
+
+Nothing about the repository reaches an inference provider on this path — not the diff, not the
+constitution, not the reasoning. `session: hosted` opts a seat into running unattended over the
+API, at cost. **A credential sitting right there does not override a `local` declaration**, which
+is the point: adding an org-wide key must not quietly switch every repo onto a paid path.
+
+Full details and a ready-to-paste routine prompt: [`LOCAL.md`](LOCAL.md).
+
 ## Two honest failures, both quiet
 
 - **Nothing merged since last time?** The session writes one line and stops. An advocate that

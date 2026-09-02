@@ -19,6 +19,8 @@ mission: >
 
 advocates:
   - name: upkeep
+    # local (the default): prepare the work, leave a work order, never call out. See LOCAL.md.
+    session: local
     mission: What this costs the person who has to keep it alive.
     # A sub-constitution: one section of the text above, not the whole of it.
     constitution: "#caretaking"
@@ -43,9 +45,15 @@ advocates:
       - Anything that needs a second repository in the checkout.
 
   - name: legibility
+    # Also local. `session: hosted` would run this unattended over the API — at cost, every
+    # week, forever, with the repository's contents leaving for an inference provider. It is
+    # a real capability and it is proven to work; it is simply not what this ships as.
+    session: local
     mission: Could the next operator copy this and understand what they copied?
     cadence: weekly
-    writes: [README.md]           # a grant, not an inherent power; still only ever a PR
+    writes: []                    # NOT WIRED YET — a non-empty grant is refused until the
+                                  # pull-request step exists. It is a grant, never an
+                                  # inherent power, and only ever a PR when it lands.
     constituency: |
       Someone who has just received this and is not online. They have the files and no one
       to ask.

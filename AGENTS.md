@@ -8,6 +8,7 @@ repository, it belongs in *that* repository's `advocate.yml`, not here.
 | --- | --- |
 | What is an advocate supposed to do? | [`METHOD.md`](METHOD.md) — the whole loop, written to hand to an agent |
 | What does the config look like? | [`advocate.example.yml`](advocate.example.yml) |
+| How do I run it without an API, or without cost? | [`LOCAL.md`](LOCAL.md) — the default path, and the routine prompt |
 | How do I mount this? | [`README.md`](README.md) → Mounting |
 | What does the action take? | [`action.yml`](action.yml) |
 | What does a consumer copy? | [`skel/`](skel/) |
@@ -22,8 +23,13 @@ repository, it belongs in *that* repository's `advocate.yml`, not here.
    whatever shape it needs.
 4. **Writes are granted, never inherent.** `writes:` defaults to `[]`. A seated advocate with no
    grant produces only its branch.
+5. **Where a session runs is declared, not inferred.** `session: local` is the default and never
+   calls an API even when a credential is present; `hosted` is an opt-in. A key appearing in the
+   org must not silently start spending money in every repo that mounts this.
 
 ## Tests
 
-`npm test` — `node test/*.test.mjs`. **Zero dependencies, on purpose**; `bin/yaml-enough.mjs` is the
+`npm test` — `node test/*.test.mjs`. The selftest workflow drives the action end to end, and
+**walks the local path only**: the hosted path costs real money on every run, so it is gated behind
+the variable `ADVOCATE_SELFTEST_HOSTED=true` and is walked on purpose or not at all. **Zero dependencies, on purpose**; `bin/yaml-enough.mjs` is the
 subset of YAML a config is allowed to be, in the house `*-enough` idiom.

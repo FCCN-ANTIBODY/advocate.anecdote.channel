@@ -13,9 +13,12 @@ assert.match(cfg.advocates[0].constituency, /^The person who runs this and did n
 assert.ok(cfg.advocates[0].constituency.includes('\n'), 'a | block keeps its newlines');
 assert.ok(!cfg.mission.trim().includes('\n'), 'a > block folds to one line');
 
-// flow sequences — the only flow collection allowed, because [] is how you spell "nothing"
+// flow sequences — the only flow collection allowed, because [] is how you spell "nothing".
+// (The parser reads a populated one fine; seats.mjs is what refuses it while grants are
+// unwired, which is a policy check, not a parsing one.)
 assert.deepEqual(cfg.advocates[0].writes, []);
-assert.deepEqual(cfg.advocates[1].writes, ['README.md']);
+assert.deepEqual(cfg.advocates[1].writes, []);
+assert.deepEqual(parse('writes: [a.md, "b c.md"]\n').writes, ['a.md', 'b c.md']);
 
 // sequences of maps
 assert.deepEqual(cfg.advocates[0].goals[0].id, 'G1');

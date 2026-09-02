@@ -28,8 +28,20 @@ inputs:
     description: "ANTHROPIC_API_KEY for the session agent. Pass a secret. Blank => stage and stop."
     required: false
     default: ""
+  workspace-id:
+    description: >
+      The ANTHROPIC workspace id — `wrkspc_01...`, from the Anthropic Console. NOT a GitHub
+      org or repository name; "workspace" means three different things in this stack. Required
+      only when the key is identity-linked (the API says so by name if it is). Not a secret —
+      a routing id, fine in a repo/org variable.
+    required: false
+    default: ""
   agent-cmd:
-    description: "Override the agent behind the session (ADVOCATE_AGENT_CMD). Blank => the bundled one."
+    description: >
+      Override the agent behind the session (ADVOCATE_AGENT_CMD). Any command honoring the
+      adapter contract works: `--available` exits 0 iff it can run, and session mode reads
+      the session JSON on stdin and prints {position, complaints, asks, session}. Blank =>
+      the bundled bin/advocate-agent, which talks to the Anthropic Messages API.
     required: false
     default: ""
   push:
@@ -39,7 +51,11 @@ inputs:
 
 outputs:
   status:
-    description: "quiet (nothing merged) | staged (no credential) | spoke (the workspace changed)"
+    description: >
+      quiet (nothing merged) | pending (session: local — prepared, work order left on the
+      branch, nothing called out) | staged (session: hosted but no agent available, or it did
+      not deliver — left for a human the same way) | seated (a first hosted session ran) |
+      spoke (a hosted session ran)
     value: ${{ steps.run.outputs.status }}
   branch:
     description: "The advocate's branch."
@@ -51,6 +67,10 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Ensure bundled scripts are executable
+      shell: bash
+      run: chmod +x "$GITHUB_ACTION_PATH"/run.sh "$GITHUB_ACTION_PATH"/bin/* 2>/dev/null || true
+
     - name: Validate advocate.yml
       shell: bash
       run: node "$GITHUB_ACTION_PATH/bin/seats.mjs" --seat "${{ inputs.advocate }}" > /dev/null
@@ -60,6 +80,7 @@ runs:
       shell: bash
       env:
         ADVOCATE_AGENT_KEY: ${{ inputs.agent-key }}
+        ANTHROPIC_WORKSPACE_ID: ${{ inputs.workspace-id }}
         ADVOCATE_AGENT_CMD: ${{ inputs.agent-cmd }}
         ADVOCATE_PUSH: ${{ inputs.push }}
         ADVOCATE_METHOD: ${{ github.action_path }}/METHOD.md

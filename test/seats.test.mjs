@@ -28,6 +28,7 @@ assert.ok(g.ok, g.err);
 assert.equal(g.out.advocates[0].branch, 'advocate/upkeep', 'branch defaults to advocate/<name>');
 assert.equal(g.out.advocates[0].cadence, 'weekly');
 assert.deepEqual(g.out.advocates[0].writes, [], 'honest defaults fire nothing');
+assert.equal(g.out.advocates[0].session, 'local', 'a session is local until a repo opts out');
 
 // inherits the repo-level constitution when the seat names none
 const inherit = run(`version: 1\nconstitution: CONSTITUTION.md\n${good.split('\n').slice(1).join('\n')}`);
@@ -41,6 +42,9 @@ const refusals = [
   ['version: 1\nadvocates:\n  - name: a\n    mission: m\n', /no constituency/],
   ['version: 1\nadvocates:\n  - name: a\n    constituency: c\n', /no mission/],
   [`version: 1\nadvocates:\n  - name: a\n    mission: m\n    constituency: c\n  - name: a\n    mission: m\n    constituency: c\n`, /duplicate/],
+  // A grant that cannot act must not parse as though it can.
+  ['version: 1\nadvocates:\n  - name: a\n    mission: m\n    constituency: c\n    writes: [README.md]\n', /not wired yet/],
+  ['version: 1\nadvocates:\n  - name: a\n    mission: m\n    constituency: c\n    session: cloud\n', /session must be/],
 ];
 for (const [yaml, re] of refusals) {
   const r = run(yaml);

@@ -25,8 +25,15 @@ Your config's `out-of-scope` names the things you will be tempted by. Believe it
 
 ## The session, in order
 
+**0. If this is your first session, you are being SEATED, not reporting.** There is no range —
+a baseline does not exist until you record one, and reporting the tip commit as "what moved" would
+be a lie about it. Read the repository as it stands and write an **opening `POSITION.md`**: where
+this is today against your goals. Do not write complaints derived from a range you did not read.
+Every session after this one is a real range.
+
 **1. Read what moved.** `bin/session.mjs <name>` has already prepared your workspace and computed the
-range. It is first-parent commits on the subject since your last session — merged pull requests
+range. If you arrived from a work order (`sessions/PENDING.md`), it names the same range — and
+**delete it before you commit**, or the session reads as still owed. It is first-parent commits on the subject since your last session — merged pull requests
 arrive here as merge commits.
 
 **If the range is empty, the session is over.** It has already written its one line. Do not reread
@@ -76,6 +83,10 @@ a workspace, and it is allowed to grow into whatever shape it needs.
 
 **9. At most one pull request**, and only if your config's `writes:` grants the path. It is a
 request; you never merge it. If you have nothing worth asking for, open nothing.
+
+**Not built yet.** No grant can be configured today — a non-empty `writes:` is refused rather
+than silently ignored. Until the step exists, a README change you want is an entry in
+`ASKS.md` like any other request.
 
 ## The README, when you are granted it
 

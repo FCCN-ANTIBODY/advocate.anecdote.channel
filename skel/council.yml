@@ -1,4 +1,7 @@
-# .github/workflows/council.yml — copy this into the repository being cared for.
+# .github/workflows/council.yml — copy this into the repository being cared for, after
+# mounting the engine as a submodule:
+#
+#   git submodule add https://github.com/FCCN-ANTIBODY/advocate.anecdote.channel .advocate-engine
 #
 # One job per advocate in advocate.yml, from one matrix. Adding an advocate is a config
 # change, never a new workflow.
@@ -33,10 +36,8 @@ jobs:
       matrix: ${{ steps.read.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
         with:
-          repository: FCCN-ANTIBODY/advocate.anecdote.channel
-          path: .advocate-engine
+          submodules: true      # .advocate-engine, mounted like every other engine here
       - id: read
         run: echo "matrix=$(node .advocate-engine/bin/seats.mjs --matrix)" >> "$GITHUB_OUTPUT"
 
@@ -50,13 +51,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0          # the range is the input; shallow hides it
-      - uses: actions/checkout@v4
-        with:
-          repository: FCCN-ANTIBODY/advocate.anecdote.channel
-          path: .advocate-engine
+          submodules: true
 
       - if: ${{ github.event.inputs.advocate == '' || github.event.inputs.advocate == matrix.name }}
         uses: ./.advocate-engine
         with:
           advocate: ${{ matrix.name }}
-          agent-key: ${{ secrets.ADVOCATE_AGENT_KEY }}   # blank => stage for a human, never fake
+          # An FCCN-ANTIBODY org secret; ANTHROPIC_API_KEY is the fallback name judgement
+          # uses. Blank => the session stages for a human and is never faked.
+          agent-key: ${{ secrets.ADVOCATE_AGENT_KEY || secrets.ANTHROPIC_API_KEY }}
+          # The Anthropic workspace id (`wrkspc_01...`, from the Anthropic Console) — not a
+          # GitHub org or repo name. Only needed when the key is identity-linked. Not a
+          # secret, so a variable is fine.
+          workspace-id: ${{ vars.ADVOCATE_WORKSPACE_ID }}

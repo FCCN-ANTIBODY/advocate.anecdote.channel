@@ -63,9 +63,14 @@ const statePath = path.join(work, 'state.json');
 const state = fs.existsSync(statePath) ? JSON.parse(fs.readFileSync(statePath, 'utf8')) : {};
 const since = state.subject && gitQuiet('cat-file', '-e', `${state.subject}^{commit}`) !== null ? state.subject : null;
 const range = since ? `${since}..${head}` : head;
-const log = git('log', '--first-parent', '--format=%H%x1f%ad%x1f%s', '--date=short', ...(since ? [range] : ['-1', head]));
+// A FIRST session has no range and must not invent one. Reporting the tip commit as
+// "what moved" would be a lie about a baseline that does not exist yet. The advocate is
+// seated instead: it records the pin and forms an opening position from the repository as
+// it stands. Everything after this is a real range.
+const first = since === null;
+const log = first ? '' : git('log', '--first-parent', '--format=%H%x1f%ad%x1f%s', '--date=short', range);
 const commits = log ? log.split('\n').map((l) => { const [sha, date, subject] = l.split('\x1f'); return { sha, date, subject }; }) : [];
-const quiet = since !== null && commits.length === 0;
+const quiet = !first && commits.length === 0;
 
 fs.mkdirSync(path.join(work, 'sessions'), { recursive: true });
 fs.writeFileSync(statePath, JSON.stringify({ subject: head, ran: today, advocate: seat.name }, null, 2) + '\n');
@@ -77,7 +82,7 @@ if (quiet) {
 
 const out = {
   advocate: seat.name, branch: seat.branch, workspace: work,
-  subject: head, since, range: since ? range : null, quiet, commits,
+  subject: head, since, range: first ? null : range, first, quiet, commits,
   writes: seat.writes, constitution: seat.constitution,
 };
 
@@ -85,8 +90,9 @@ if (flags.includes('--json')) { console.log(JSON.stringify(out, null, 2)); }
 else {
   console.log(`advocate ${seat.name} → ${seat.branch}`);
   console.log(`  workspace: ${out.workspace}`);
-  console.log(quiet ? `  quiet: subject unchanged at ${head.slice(0, 7)}`
-                    : `  ${commits.length} commit(s) since ${since ? since.slice(0, 7) : 'the beginning'}`);
+  console.log(first ? `  seated at ${head.slice(0, 7)} — no range yet; form an opening position`
+            : quiet ? `  quiet: subject unchanged at ${head.slice(0, 7)}`
+                    : `  ${commits.length} commit(s) since ${since.slice(0, 7)}`);
   for (const c of commits.slice(0, 20)) console.log(`  ${c.sha.slice(0, 7)} ${c.date} ${c.subject}`);
 }
 process.exit(0);

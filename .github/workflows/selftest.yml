@@ -1,0 +1,174 @@
+# The framework proving itself: unit tests, then the action driven end to end against this
+# very repository as its own subject. Nothing is pushed and no credential is used — the run
+# asserts the two HONEST FAILURES, which are the paths a scheduled council actually takes
+# most weeks.
+
+name: selftest
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm test
+
+  action:
+    runs-on: ubuntu-latest
+    # `secrets` is not an allowed context in a step `if:` — it has to arrive as env first.
+    env:
+      AGENT_KEY: ${{ secrets.ADVOCATE_AGENT_KEY || secrets.ANTHROPIC_API_KEY }}
+      WORKSPACE_ID: ${{ vars.ADVOCATE_WORKSPACE_ID }}
+      # The hosted path is proven and costs real money, so CI does not walk it by default.
+      # Set the repo/org variable ADVOCATE_SELFTEST_HOSTED=true to exercise it deliberately.
+      RUN_HOSTED: ${{ vars.ADVOCATE_SELFTEST_HOSTED }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # the range is the input; shallow hides it
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+
+      - name: Seat a scratch advocate on this repo
+        run: cp advocate.example.yml advocate.yml
+
+      # No agent-key: the session must STAGE for a human, never fabricate one.
+      - id: first
+        uses: ./
+        with:
+          advocate: upkeep
+          push: "false"
+
+      - name: The first run stayed local, and did not invent a range
+        run: |
+          # `upkeep` declares session: local, so this must NOT call out even though a
+          # credential is reachable from the org — that is the whole point of the switch.
+          test "${{ steps.first.outputs.status }}" = "pending" \
+            || { echo "expected status=pending, got '${{ steps.first.outputs.status }}'"; exit 1; }
+          test "${{ steps.first.outputs.commits }}" = "0" \
+            || { echo "a first session has no range; got ${{ steps.first.outputs.commits }} commit(s)"; exit 1; }
+          test "${{ steps.first.outputs.branch }}" = "advocate/upkeep" \
+            || { echo "expected branch=advocate/upkeep, got '${{ steps.first.outputs.branch }}'"; exit 1; }
+          git rev-parse --verify advocate/upkeep >/dev/null
+          git show advocate/upkeep:state.json
+          git ls-tree -r --name-only advocate/upkeep
+          git cat-file -e advocate/upkeep:sessions/PENDING.md \
+            || { echo "a local session left no work order"; exit 1; }
+          echo "--- the work order ---"; git show advocate/upkeep:sessions/PENDING.md
+
+      - name: The workspace is an orphan and main never learned about it
+        run: |
+          test -z "$(git log --format=%P -1 advocate/upkeep)" \
+            || { echo "advocate/upkeep is not an orphan"; exit 1; }
+          git merge-base --is-ancestor advocate/upkeep HEAD 2>/dev/null \
+            && { echo "advocate branch is reachable from main"; exit 1; }
+          test -z "$(git status --porcelain -- ':!advocate.yml')" \
+            || { echo "the subject tree was left dirty:"; git status --porcelain; exit 1; }
+
+      # Nothing has merged since the first run, so this one must go quiet.
+      - id: second
+        uses: ./
+        with:
+          advocate: upkeep
+          push: "false"
+
+      - name: The second run went quiet
+        run: |
+          test "${{ steps.second.outputs.status }}" = "quiet" \
+            || { echo "expected status=quiet, got '${{ steps.second.outputs.status }}'"; exit 1; }
+          git show "advocate/upkeep:sessions/$(date -u +%Y-%m-%d).md"
+
+      - name: Which agent credential is visible here
+        run: |
+          present() { if [ -n "$1" ]; then echo yes; else echo no; fi; }
+          echo "agent key    present: $(present "$AGENT_KEY")"
+          echo "workspace id present: $(present "$WORKSPACE_ID")"
+          # The value matters as much as the label: this is the ANTHROPIC workspace
+          # (wrkspc_...), not a GitHub org. Say so here rather than in an API error.
+          if [ -n "$WORKSPACE_ID" ] && [ "${WORKSPACE_ID#wrkspc_}" = "$WORKSPACE_ID" ]; then
+            echo "::warning::the workspace id is set but is not an Anthropic workspace id (expected wrkspc_01...) — hosted sessions will stay staged"
+          fi
+          echo "hosted path this run: ${RUN_HOSTED:-false} (set ADVOCATE_SELFTEST_HOSTED=true to spend credits on purpose)"
+
+      - name: Both shipped seats stay local
+        run: |
+          node bin/seats.mjs --matrix | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+            const m=JSON.parse(s).include, bad=m.filter(x=>x.session!=="local");
+            if(bad.length){ console.error("a shipped seat is hosted:", bad.map(x=>x.name).join(", ")); process.exit(1); }
+            console.log("all shipped seats local:", m.map(x=>x.name).join(", "));
+          })'
+
+      # The hosted path costs money on every run, so it is walked only on purpose. Seating a
+      # hosted advocate here rather than in the shipped example keeps the default free.
+      - name: Opt in to the hosted path
+        if: env.AGENT_KEY != '' && env.RUN_HOSTED == 'true'
+        run: |
+          node -e '
+            const fs = require("fs");
+            const f = "advocate.yml";
+            const out = fs.readFileSync(f, "utf8").replace(/(- name: legibility\n)/, "$1    session: hosted\n");
+            if (out === fs.readFileSync(f, "utf8")) { console.error("could not seat a hosted advocate"); process.exit(1); }
+            fs.writeFileSync(f, out);
+          '
+          node bin/seats.mjs --seat legibility | grep -q '"session": "hosted"' || { echo "legibility is not hosted"; exit 1; }
+
+      # `legibility` has never run, so this is a first session and must come back `seated`.
+      - id: live
+        if: env.AGENT_KEY != '' && env.RUN_HOSTED == 'true'
+        continue-on-error: true    # a half-configured credential warns; it does not fail the suite
+        uses: ./
+        with:
+          advocate: legibility
+          agent-key: ${{ secrets.ADVOCATE_AGENT_KEY || secrets.ANTHROPIC_API_KEY }}
+          workspace-id: ${{ env.WORKSPACE_ID }}
+          push: "false"
+
+      - name: The live session was seated and wrote real files
+        if: env.AGENT_KEY != '' && env.RUN_HOSTED == 'true'
+        run: |
+          status="${{ steps.live.outputs.status }}"
+          # `staged` here means the credential could not complete a session — the honest
+          # failure doing its job. That is a configuration gap, not a broken framework, so
+          # it warns; anything other than staged-or-seated is a real regression.
+          if [ "$status" = "staged" ]; then
+            echo "::warning::the agent credential is present but no session ran (status=staged) — see the Run ./ log for the reason"
+            exit 0
+          fi
+          test "$status" = "seated" || { echo "expected status=seated, got '$status'"; exit 1; }
+          for f in POSITION.md COMPLAINTS.md ASKS.md; do
+            git cat-file -e "advocate/legibility:$f" || { echo "missing $f"; exit 1; }
+            test "$(git show "advocate/legibility:$f" | wc -c)" -gt 100 || { echo "$f is thin or empty"; exit 1; }
+          done
+          echo "--- POSITION.md ---"; git show advocate/legibility:POSITION.md
+          echo; echo "--- COMPLAINTS.md ---"; git show advocate/legibility:COMPLAINTS.md
+          echo; echo "--- tree ---"; git ls-tree -r --name-only advocate/legibility
+
+      - name: pending.mjs finds the order from the branch alone
+        run: |
+          node bin/pending.mjs
+          node bin/pending.mjs --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+            const o=JSON.parse(s);
+            if(!o.some(x=>x.advocate==="upkeep")) { console.error("pending did not find upkeep"); process.exit(1); }
+            console.log("pending sees:", o.map(x=>x.advocate).join(", "));
+          })'
+
+      - name: A config that cannot be read stops the council
+        run: |
+          printf 'version: 1\nadvocates:\n  - name: a\n    mission: m\n' > advocate.yml
+          if node bin/seats.mjs --seat a; then echo "should have refused"; exit 1; fi
+          echo "refused, as it should"
+
+      - name: An unwired grant is refused, not silently ignored
+        run: |
+          printf 'version: 1\nadvocates:\n  - name: a\n    mission: m\n    constituency: c\n    writes: [README.md]\n' > advocate.yml
+          if node bin/seats.mjs --seat a; then echo "an unwired writes: grant was accepted"; exit 1; fi
+          echo "refused, as it should"
