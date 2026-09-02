@@ -29,7 +29,20 @@ jobs:
       AGENT_KEY: ${{ secrets.ADVOCATE_AGENT_KEY || secrets.ANTHROPIC_API_KEY }}
       ALT_CLAUDE_KEY: ${{ secrets.CLAUDE_API_KEY }}
       ALT_ADVOCATE_KEY: ${{ secrets.ADVOCATE_AGENT_KEY }}
-      WORKSPACE_ID: ${{ vars.ADVOCATE_WORKSPACE_ID }}
+      # The workspace id's label is whatever it was typed as. Try the likely names, in both
+      # contexts, and report which one answered — a variable is not readable over the API, so
+      # the runner is the only place that can tell us.
+      WORKSPACE_ID: ${{ vars.ADVOCATE_WORKSPACE_ID || vars.ANTHROPIC_WORKSPACE_ID || vars.ADVOCATE_AGENT_WORKSPACE || vars.ADVOCATE_WORKSPACE || vars.ANTHROPIC_WORKSPACE || vars.WORKSPACE_ID || secrets.ADVOCATE_WORKSPACE_ID || secrets.ANTHROPIC_WORKSPACE_ID || secrets.ADVOCATE_AGENT_WORKSPACE || secrets.ADVOCATE_WORKSPACE || secrets.ANTHROPIC_WORKSPACE || secrets.WORKSPACE_ID }}
+      V_ADVOCATE_WORKSPACE_ID: ${{ vars.ADVOCATE_WORKSPACE_ID }}
+      V_ANTHROPIC_WORKSPACE_ID: ${{ vars.ANTHROPIC_WORKSPACE_ID }}
+      V_ADVOCATE_AGENT_WORKSPACE: ${{ vars.ADVOCATE_AGENT_WORKSPACE }}
+      V_ADVOCATE_WORKSPACE: ${{ vars.ADVOCATE_WORKSPACE }}
+      V_ANTHROPIC_WORKSPACE: ${{ vars.ANTHROPIC_WORKSPACE }}
+      V_WORKSPACE_ID: ${{ vars.WORKSPACE_ID }}
+      S_ADVOCATE_WORKSPACE_ID: ${{ secrets.ADVOCATE_WORKSPACE_ID }}
+      S_ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+      S_ADVOCATE_WORKSPACE: ${{ secrets.ADVOCATE_WORKSPACE }}
+      S_WORKSPACE_ID: ${{ secrets.WORKSPACE_ID }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -92,7 +105,13 @@ jobs:
           echo "resolved agent key  present: $(present "$AGENT_KEY")"
           echo "CLAUDE_API_KEY     present: $(present "$ALT_CLAUDE_KEY")"
           echo "ADVOCATE_AGENT_KEY present: $(present "$ALT_ADVOCATE_KEY")"
-          echo "ADVOCATE_WORKSPACE_ID (var) present: $(present "$WORKSPACE_ID")"
+          echo "resolved workspace id present: $(present "$WORKSPACE_ID") (${#WORKSPACE_ID} chars)"
+          echo "-- which label answered --"
+          for n in V_ADVOCATE_WORKSPACE_ID V_ANTHROPIC_WORKSPACE_ID V_ADVOCATE_AGENT_WORKSPACE \
+                   V_ADVOCATE_WORKSPACE V_ANTHROPIC_WORKSPACE V_WORKSPACE_ID \
+                   S_ADVOCATE_WORKSPACE_ID S_ANTHROPIC_WORKSPACE_ID S_ADVOCATE_WORKSPACE S_WORKSPACE_ID; do
+            printf '  %-28s %s\n' "$n" "$(present "${!n}")"
+          done
 
       # A real session, only when a credential is actually reachable. `legibility` has never
       # run, so this is a first session and must come back `seated` with an opening position.
@@ -103,7 +122,7 @@ jobs:
         with:
           advocate: legibility
           agent-key: ${{ secrets.ADVOCATE_AGENT_KEY || secrets.ANTHROPIC_API_KEY }}
-          workspace-id: ${{ vars.ADVOCATE_WORKSPACE_ID }}
+          workspace-id: ${{ env.WORKSPACE_ID }}
           push: "false"
 
       - name: The live session was seated and wrote real files
