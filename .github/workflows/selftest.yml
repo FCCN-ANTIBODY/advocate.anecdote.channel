@@ -41,10 +41,12 @@ jobs:
           advocate: upkeep
           push: "false"
 
-      - name: The first run staged the range
+      - name: The first run staged, and did not invent a range
         run: |
           test "${{ steps.first.outputs.status }}" = "staged" \
             || { echo "expected status=staged, got '${{ steps.first.outputs.status }}'"; exit 1; }
+          test "${{ steps.first.outputs.commits }}" = "0" \
+            || { echo "a first session has no range; got ${{ steps.first.outputs.commits }} commit(s)"; exit 1; }
           test "${{ steps.first.outputs.branch }}" = "advocate/upkeep" \
             || { echo "expected branch=advocate/upkeep, got '${{ steps.first.outputs.branch }}'"; exit 1; }
           git rev-parse --verify advocate/upkeep >/dev/null

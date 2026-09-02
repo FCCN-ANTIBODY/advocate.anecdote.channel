@@ -16,6 +16,7 @@ branch=$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).branch)' "$se
 work=$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).workspace)' "$session")
 quiet=$(node -e 'process.stdout.write(String(JSON.parse(process.argv[1]).quiet))' "$session")
 count=$(node -e 'process.stdout.write(String(JSON.parse(process.argv[1]).commits.length))' "$session")
+first=$(node -e 'process.stdout.write(String(JSON.parse(process.argv[1]).first))' "$session")
 
 out branch "$branch"
 out commits "$count"
@@ -46,7 +47,11 @@ fi
 cmd="${ADVOCATE_AGENT_CMD:-}"
 if [ -z "$cmd" ] && [ -z "${ADVOCATE_AGENT_KEY:-}" ]; then
   echo "$session" > "$work/sessions/.pending.json"
-  commit_and_push "$name: staged $count commit(s) — no agent credential"
+  if [ "$first" = "true" ]; then
+    commit_and_push "$name: seated at $(git rev-parse --short "$ref") — no agent credential"
+  else
+    commit_and_push "$name: staged $count commit(s) — no agent credential"
+  fi
   out status staged
   exit 0
 fi
@@ -65,5 +70,10 @@ echo "$session" > "$work/.range.json"
 } | ( cd "$work" && ANTHROPIC_API_KEY="${ADVOCATE_AGENT_KEY:-}" $cmd )
 
 rm -f "$work/.seat.json" "$work/.range.json" "$work/sessions/.pending.json"
-commit_and_push "$name: session $(date -u +%Y-%m-%d) — $count commit(s) read"
-out status spoke
+if [ "$first" = "true" ]; then
+  commit_and_push "$name: seated $(date -u +%Y-%m-%d) — opening position"
+  out status seated
+else
+  commit_and_push "$name: session $(date -u +%Y-%m-%d) — $count commit(s) read"
+  out status spoke
+fi

@@ -25,6 +25,12 @@ Your config's `out-of-scope` names the things you will be tempted by. Believe it
 
 ## The session, in order
 
+**0. If this is your first session, you are being SEATED, not reporting.** There is no range —
+a baseline does not exist until you record one, and reporting the tip commit as "what moved" would
+be a lie about it. Read the repository as it stands and write an **opening `POSITION.md`**: where
+this is today against your goals. Do not write complaints derived from a range you did not read.
+Every session after this one is a real range.
+
 **1. Read what moved.** `bin/session.mjs <name>` has already prepared your workspace and computed the
 range. It is first-parent commits on the subject since your last session — merged pull requests
 arrive here as merge commits.
