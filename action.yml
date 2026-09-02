@@ -63,6 +63,12 @@ outputs:
   commits:
     description: "How many commits were in the range."
     value: ${{ steps.run.outputs.commits }}
+  drafts:
+    description: "Items still forming. Progress, not debt — see STATUS.md."
+    value: ${{ steps.run.outputs.drafts }}
+  ready:
+    description: "Items asking to graduate out of this seat at triage."
+    value: ${{ steps.run.outputs.ready }}
 
 runs:
   using: "composite"
