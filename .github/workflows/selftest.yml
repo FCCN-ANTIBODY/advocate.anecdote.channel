@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     # `secrets` is not an allowed context in a step `if:` — it has to arrive as env first.
     env:
-      AGENT_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      AGENT_KEY: ${{ secrets.ADVOCATE_AGENT_KEY || secrets.ANTHROPIC_API_KEY }}
       ALT_CLAUDE_KEY: ${{ secrets.CLAUDE_API_KEY }}
       ALT_ADVOCATE_KEY: ${{ secrets.ADVOCATE_AGENT_KEY }}
     steps:
@@ -94,7 +94,7 @@ jobs:
         uses: ./
         with:
           advocate: legibility
-          agent-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          agent-key: ${{ secrets.ADVOCATE_AGENT_KEY || secrets.ANTHROPIC_API_KEY }}
           push: "false"
 
       - name: The live session was seated and wrote real files
