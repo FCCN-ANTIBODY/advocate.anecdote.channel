@@ -75,6 +75,34 @@ jobs:
             || { echo "expected status=quiet, got '${{ steps.second.outputs.status }}'"; exit 1; }
           git show "advocate/upkeep:sessions/$(date -u +%Y-%m-%d).md"
 
+      - name: Which agent credential is visible here
+        run: |
+          echo "ANTHROPIC_API_KEY present: ${{ secrets.ANTHROPIC_API_KEY != '' }}"
+          echo "CLAUDE_API_KEY    present: ${{ secrets.CLAUDE_API_KEY != '' }}"
+          echo "ADVOCATE_AGENT_KEY present: ${{ secrets.ADVOCATE_AGENT_KEY != '' }}"
+
+      # A real session, only when a credential is actually reachable. `legibility` has never
+      # run, so this is a first session and must come back `seated` with an opening position.
+      - id: live
+        if: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        uses: ./
+        with:
+          advocate: legibility
+          agent-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          push: "false"
+
+      - name: The live session was seated and wrote real files
+        if: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        run: |
+          test "${{ steps.live.outputs.status }}" = "seated" \
+            || { echo "expected status=seated, got '${{ steps.live.outputs.status }}'"; exit 1; }
+          for f in POSITION.md COMPLAINTS.md ASKS.md; do
+            git cat-file -e "advocate/legibility:$f" || { echo "missing $f"; exit 1; }
+            test -s <(git show "advocate/legibility:$f") || { echo "$f is empty"; exit 1; }
+          done
+          echo "--- POSITION.md ---"; git show advocate/legibility:POSITION.md
+          echo "--- sessions ---";    git ls-tree -r --name-only advocate/legibility
+
       - name: A config that cannot be read stops the council
         run: |
           printf 'version: 1\nadvocates:\n  - name: a\n    mission: m\n' > advocate.yml

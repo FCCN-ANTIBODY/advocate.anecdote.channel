@@ -21,6 +21,8 @@ first=$(node -e 'process.stdout.write(String(JSON.parse(process.argv[1]).first))
 out branch "$branch"
 out commits "$count"
 
+for f in POSITION.md COMPLAINTS.md ASKS.md; do [ -f "$work/$f" ] || : > "$work/$f"; done
+
 git -C "$work" config user.name  "${ADVOCATE_COMMITTER_NAME:-advocate}"
 git -C "$work" config user.email "${ADVOCATE_COMMITTER_EMAIL:-advocate@users.noreply.github.com}"
 
@@ -43,33 +45,51 @@ if [ "$quiet" = "true" ]; then
   exit 0
 fi
 
-# 2. No credential. Stage what moved for a human and stop — never fabricate a session.
-cmd="${ADVOCATE_AGENT_CMD:-}"
-if [ -z "$cmd" ] && [ -z "${ADVOCATE_AGENT_KEY:-}" ]; then
+# 2. Is a session summonable at all? Probe first, so "no credential" degrades to a staged
+#    session for a human rather than a faked one. Any adapter honoring the stdin/stdout
+#    contract can stand behind ADVOCATE_AGENT_CMD; the bundled one talks to the Messages API.
+export ANTHROPIC_API_KEY="${ADVOCATE_AGENT_KEY:-${ANTHROPIC_API_KEY:-}}"
+cmd="${ADVOCATE_AGENT_CMD:-$here/bin/advocate-agent}"
+
+if ! $cmd --available >/dev/null 2>&1; then
   echo "$session" > "$work/sessions/.pending.json"
   if [ "$first" = "true" ]; then
-    commit_and_push "$name: seated at $(git rev-parse --short "$ref") — no agent credential"
+    commit_and_push "$name: seated at $(git rev-parse --short "$ref") — no agent available"
   else
-    commit_and_push "$name: staged $count commit(s) — no agent credential"
+    commit_and_push "$name: staged $count commit(s) — no agent available"
   fi
   out status staged
   exit 0
 fi
 
-# 3. Run the session. The agent gets the method, the seat, and the range; nothing else.
-node "$here/bin/seats.mjs" --seat "$name" > "$work/.seat.json"
-echo "$session" > "$work/.range.json"
-: "${cmd:=claude -p --permission-mode acceptEdits}"
-{
-  echo "Run one advocate session. The method is law; follow it in order."
-  echo; echo "=== METHOD ==="; cat "${ADVOCATE_METHOD:-$here/METHOD.md}"
-  echo; echo "=== YOUR SEAT (advocate.yml) ==="; cat "$work/.seat.json"
-  echo; echo "=== WHAT MOVED ==="; cat "$work/.range.json"
-  echo; echo "Your workspace is $work. The subject repository is $(git rev-parse --show-toplevel)."
-  echo "Write only inside your workspace. Do not commit; the caller does that."
-} | ( cd "$work" && ANTHROPIC_API_KEY="${ADVOCATE_AGENT_KEY:-}" $cmd )
+# 3. Summon the session. It receives the method, its seat, the range, and its own current
+#    files — and nothing else. It returns four whole documents; this script writes them.
+agent_in="$(jq -n \
+  --rawfile method "${ADVOCATE_METHOD:-$here/METHOD.md}" \
+  --argjson seat "$(node "$here/bin/seats.mjs" --seat "$name")" \
+  --argjson range "$session" \
+  --rawfile position "$work/POSITION.md" \
+  --rawfile complaints "$work/COMPLAINTS.md" \
+  --rawfile asks "$work/ASKS.md" \
+  '{method: $method, seat: $seat, range: $range,
+    current: {position: $position, complaints: $complaints, asks: $asks}}')"
 
-rm -f "$work/.seat.json" "$work/.range.json" "$work/sessions/.pending.json"
+raw="$(printf '%s' "$agent_in" | $cmd || true)"
+if ! printf '%s' "$raw" | jq -e '.position and .complaints and .asks and .session' >/dev/null 2>&1; then
+  # The agent was available and did not deliver. That is a not-available state too: stage
+  # it for a human rather than write half a session.
+  echo "$session" > "$work/sessions/.pending.json"
+  commit_and_push "$name: staged $count commit(s) — the session did not return"
+  out status staged
+  exit 1
+fi
+
+printf '%s' "$raw" | jq -r '.position'   > "$work/POSITION.md"
+printf '%s' "$raw" | jq -r '.complaints' > "$work/COMPLAINTS.md"
+printf '%s' "$raw" | jq -r '.asks'       > "$work/ASKS.md"
+printf '%s' "$raw" | jq -r '.session'    > "$work/sessions/$(date -u +%Y-%m-%d).md"
+rm -f "$work/sessions/.pending.json"
+
 if [ "$first" = "true" ]; then
   commit_and_push "$name: seated $(date -u +%Y-%m-%d) — opening position"
   out status seated

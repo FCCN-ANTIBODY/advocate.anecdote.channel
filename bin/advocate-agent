@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# The bundled reference agent adapter for an advocate session. Summons the session over the
+# Anthropic Messages API, given agent credentials. This is ONE adapter behind the
+# ADVOCATE_AGENT_CMD seam, not the only one: any command honoring the same stdin/stdout
+# contract can replace it (a different provider, a local model, a human writing the files).
+#
+# Availability probe:
+#   bin/advocate-agent --available   -> exit 0 iff it can run (has credentials), else exit 1.
+# run.sh calls this first so a session can degrade to `staged` instead of being faked.
+#
+# Session mode (no --available): read stdin JSON
+#   { method, seat, range, current: {position, complaints, asks} }
+# and print
+#   { position, complaints, asks, session }  — four markdown documents, each a whole file.
+#
+# Credentials + model (override to taste):
+#   ANTHROPIC_API_KEY   required to run; absent => --available fails => run.sh stages it.
+#   ADVOCATE_MODEL      default claude-opus-5.
+#   ADVOCATE_EFFORT     default high.
+#   ADVOCATE_API_URL    default https://api.anthropic.com/v1/messages.
+set -euo pipefail
+
+api_key="${ANTHROPIC_API_KEY:-}"
+model="${ADVOCATE_MODEL:-claude-opus-5}"
+effort="${ADVOCATE_EFFORT:-high}"
+url="${ADVOCATE_API_URL:-https://api.anthropic.com/v1/messages}"
+
+if [ "${1:-}" = "--available" ]; then
+  [ -n "$api_key" ] && exit 0 || exit 1
+fi
+[ -n "$api_key" ] || { echo "advocate-agent: no credentials" >&2; exit 1; }
+
+in="$(cat)"
+
+system='You are an advocate: a standing seat that speaks for one constituency about what it takes to KEEP A REPOSITORY RUNNING for the people who depend on it. You are not here for the correctness of the code (tests own that) or for the content it publishes. You hold no authority: you decide nothing, you merge nothing, and every output is a position or a request that a human is free to decline.
+
+The METHOD you are given is law. Follow it in order and obey its refusals — especially these: never widen scope beyond the repository in front of you; report a goal you cannot measure as unmeasured rather than estimating; write complaints in the constituency VOICE as felt problems, never as proposed fixes; label every complaint source as simulated, relayed or observed, where simulated is your own voice and is NOT testimony; try to close a complaint before adding one; and never manufacture output because a schedule fired.
+
+Return four whole markdown documents. POSITION is rewritten entirely each session — it is a position, not a log. COMPLAINTS and ASKS are the previous files carried forward with your edits applied, preserving entries you are not changing. SESSION is the record of this run: the range you read, what changed, and what you deliberately did NOT say.'
+
+body="$(jq -n --arg model "$model" --arg system "$system" --arg effort "$effort" --argjson in "$in" '
+  {
+    model: $model,
+    max_tokens: 16000,
+    thinking: { type: "adaptive" },
+    fallbacks: "default",
+    system: $system,
+    output_config: {
+      effort: $effort,
+      format: { type: "json_schema", schema: {
+        type: "object",
+        properties: {
+          position:   { type: "string", description: "POSITION.md in full, rewritten." },
+          complaints: { type: "string", description: "COMPLAINTS.md in full, carried forward." },
+          asks:       { type: "string", description: "ASKS.md in full, carried forward." },
+          session:    { type: "string", description: "The session note for today." }
+        },
+        required: ["position", "complaints", "asks", "session"],
+        additionalProperties: false
+      } }
+    },
+    messages: [ { role: "user", content: (
+      "=== METHOD (law; follow in order) ===\n" + ($in.method // "") +
+      "\n\n=== YOUR SEAT ===\n" + ($in.seat | tojson) +
+      "\n\n=== WHAT MOVED ===\n" + ($in.range | tojson) +
+      "\n\n=== YOUR CURRENT FILES ===\n--- POSITION.md ---\n" + ($in.current.position // "(none yet)") +
+      "\n\n--- COMPLAINTS.md ---\n" + ($in.current.complaints // "(none yet)") +
+      "\n\n--- ASKS.md ---\n" + ($in.current.asks // "(none yet)")
+    ) } ]
+  }')"
+
+response="$(printf '%s' "$body" | curl -sS "$url" \
+  -H "content-type: application/json" \
+  -H "x-api-key: $api_key" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "anthropic-beta: server-side-fallback-2026-07-01" \
+  --data-binary @- )"
+
+if [ "$(printf '%s' "$response" | jq -r '.type // ""')" = "error" ]; then
+  echo "advocate-agent: $(printf '%s' "$response" | jq -r '.error.message // "api error"')" >&2
+  exit 1
+fi
+
+# A policy decline is a not-available state, never a fabricated session.
+if [ "$(printf '%s' "$response" | jq -r '.stop_reason // ""')" = "refusal" ]; then
+  echo "advocate-agent: the request was declined ($(printf '%s' "$response" | jq -r '.stop_details.category // "unknown"'))" >&2
+  exit 1
+fi
+
+printf '%s' "$response" | jq -e '.content[] | select(.type == "text") | .text | fromjson' \
+  || { echo "advocate-agent: no parsable session in the response" >&2; exit 1; }

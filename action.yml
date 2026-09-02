@@ -29,7 +29,11 @@ inputs:
     required: false
     default: ""
   agent-cmd:
-    description: "Override the agent behind the session (ADVOCATE_AGENT_CMD). Blank => the bundled one."
+    description: >
+      Override the agent behind the session (ADVOCATE_AGENT_CMD). Any command honoring the
+      adapter contract works: `--available` exits 0 iff it can run, and session mode reads
+      the session JSON on stdin and prints {position, complaints, asks, session}. Blank =>
+      the bundled bin/advocate-agent, which talks to the Anthropic Messages API.
     required: false
     default: ""
   push:
@@ -39,7 +43,9 @@ inputs:
 
 outputs:
   status:
-    description: "quiet (nothing merged) | staged (no credential) | spoke (the workspace changed)"
+    description: >
+      quiet (nothing merged) | seated (a first session, no range yet) | staged (no agent
+      available, or it did not deliver — left for a human) | spoke (the workspace changed)
     value: ${{ steps.run.outputs.status }}
   branch:
     description: "The advocate's branch."
@@ -51,6 +57,10 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Ensure bundled scripts are executable
+      shell: bash
+      run: chmod +x "$GITHUB_ACTION_PATH"/run.sh "$GITHUB_ACTION_PATH"/bin/* 2>/dev/null || true
+
     - name: Validate advocate.yml
       shell: bash
       run: node "$GITHUB_ACTION_PATH/bin/seats.mjs" --seat "${{ inputs.advocate }}" > /dev/null
