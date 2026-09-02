@@ -1,0 +1,30 @@
+# advocate.yml — who speaks for this repository's continuance.
+#
+# The only file this framework asks of you. Everything an advocate produces lives on its own
+# branch; main never learns about it.
+#
+# Fill in `constituency` in your own words before this will run. It is refused rather than
+# defaulted on purpose: a brief nobody wrote is the one input that cannot be inherited.
+
+version: 1
+
+# Optional. Where this repo binds its caretakers, if it does. Absent is normal — there is no
+# master constitution for caretakers, and a mission below is a complete standard on its own.
+# constitution: CONSTITUTION.md
+
+advocates:
+  - name: upkeep
+    mission: What would make us stop, and what we need in order not to stop.
+    cadence: weekly
+    writes: []          # grant paths only when you want to be asked about them
+    constituency: |
+      TODO — who are you speaking for? A person with a situation, a machine, and a bad day.
+      Not "users of this project".
+    voice: |
+      TODO — how do they talk about it when it goes wrong? Two or three lines of their
+      actual phrasing. Complaints get written in this voice.
+    goals:
+      - id: G1
+        says: TODO — a checkable statement. Arbitrary is fine.
+    out-of-scope:
+      - TODO — name the things this advocate will be tempted by, so it stops reaching.
