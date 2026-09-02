@@ -30,8 +30,10 @@ inputs:
     default: ""
   workspace-id:
     description: >
-      Anthropic workspace id, required only when the key is identity-linked (the API says so
-      by name if it is). Not a secret — a routing id, fine in a repo/org variable.
+      The ANTHROPIC workspace id — `wrkspc_01...`, from the Anthropic Console. NOT a GitHub
+      org or repository name; "workspace" means three different things in this stack. Required
+      only when the key is identity-linked (the API says so by name if it is). Not a secret —
+      a routing id, fine in a repo/org variable.
     required: false
     default: ""
   agent-cmd:

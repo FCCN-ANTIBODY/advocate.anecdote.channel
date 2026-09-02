@@ -77,3 +77,17 @@ If you would rather GitHub never act, drop the `schedule:` trigger from `council
 `workflow_dispatch:`. **The workflow is still the definition of the pipeline** — it just stops
 being the thing that fires it, which is the posture the rest of this constellation already takes
 with its dormant crons.
+
+## If you do turn a seat `hosted`
+
+Two values, and the second one is easy to misread:
+
+| what | where | shape |
+| --- | --- | --- |
+| `ADVOCATE_AGENT_KEY` | an org **secret** | the API key |
+| `ADVOCATE_WORKSPACE_ID` | an org **variable** | `wrkspc_01...`, from the **Anthropic Console** |
+
+The second is needed only when the key is identity-linked, and it is the **Anthropic** workspace —
+not a GitHub org or repository. "Workspace" means three separate things in this stack (the Actions
+checkout, the advocate's branch, and the Anthropic one), so `bin/advocate-agent` refuses a value
+that is obviously not an id rather than spending a call to be told.

@@ -15,9 +15,10 @@
 #
 # Credentials + model (override to taste):
 #   ANTHROPIC_API_KEY   required to run; absent => --available fails => run.sh stages it.
-#   ANTHROPIC_WORKSPACE_ID  required IFF the key is identity-linked, which the API tells you
-#                       plainly ("anthropic-workspace-id is required..."). Not a secret — a
-#                       routing id. Sent only when set, so a plain key needs nothing.
+#   ANTHROPIC_WORKSPACE_ID  the ANTHROPIC workspace id (`wrkspc_01...`, from the Console) —
+#                       not a GitHub org or repo. Required IFF the key is identity-linked,
+#                       which the API tells you plainly ("anthropic-workspace-id is
+#                       required..."). Not a secret — a routing id. Sent only when set.
 #   ADVOCATE_MODEL      default claude-opus-5.
 #   ADVOCATE_EFFORT     default high.
 #   ADVOCATE_API_URL    default https://api.anthropic.com/v1/messages.
@@ -28,6 +29,16 @@ model="${ADVOCATE_MODEL:-claude-opus-5}"
 effort="${ADVOCATE_EFFORT:-high}"
 url="${ADVOCATE_API_URL:-https://api.anthropic.com/v1/messages}"
 workspace="${ANTHROPIC_WORKSPACE_ID:-${ADVOCATE_WORKSPACE_ID:-}}"
+
+# "Workspace" means three different things around here — the Actions workspace, the
+# advocate's branch workspace, and the Anthropic one. This is the Anthropic one, and it is
+# an id (wrkspc_...), never an org or repository name. Catch the mix-up locally instead of
+# spending a call to be told.
+if [ -n "$workspace" ] && [ "${workspace#wrkspc_}" = "$workspace" ]; then
+  echo "advocate-agent: '$workspace' is not an Anthropic workspace id — those look like 'wrkspc_01...'." >&2
+  echo "advocate-agent: this is the workspace the API KEY acts in, from the Anthropic Console, not a GitHub org or repo." >&2
+  exit 1
+fi
 
 if [ "${1:-}" = "--available" ]; then
   [ -n "$api_key" ] && exit 0 || exit 1
