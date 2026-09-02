@@ -97,6 +97,12 @@ workspace, requires no header, and lets you delete the variable entirely. Only a
 key demands the id — so if the Console will not let you copy the string, change the key instead of
 fighting the string.
 
+Create the key **from inside the workspace you want it scoped to** (Console → that workspace → API
+keys → create). A key made there is bound to it, and nothing ever has to name the id. The
+workspace list elides ids in the middle (`wrkspc_01…5GRxn5C`) and the truncation is in the markup,
+not just the styling, so there is no full string on the page to select — on a phone especially,
+this route is the only comfortable one.
+
 If you do want the id and the Console truncates it on screen, read it where nothing truncates:
 
 ```sh
