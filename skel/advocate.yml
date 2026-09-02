@@ -16,6 +16,7 @@ advocates:
   - name: upkeep
     mission: What would make us stop, and what we need in order not to stop.
     cadence: weekly
+    session: local      # never calls an API. `hosted` opts in, at cost — see LOCAL.md
     writes: []          # grant paths only when you want to be asked about them
     constituency: |
       TODO — who are you speaking for? A person with a situation, a machine, and a bad day.

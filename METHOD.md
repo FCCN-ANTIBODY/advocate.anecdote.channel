@@ -32,7 +32,8 @@ this is today against your goals. Do not write complaints derived from a range y
 Every session after this one is a real range.
 
 **1. Read what moved.** `bin/session.mjs <name>` has already prepared your workspace and computed the
-range. It is first-parent commits on the subject since your last session — merged pull requests
+range. If you arrived from a work order (`sessions/PENDING.md`), it names the same range — and
+**delete it before you commit**, or the session reads as still owed. It is first-parent commits on the subject since your last session — merged pull requests
 arrive here as merge commits.
 
 **If the range is empty, the session is over.** It has already written its one line. Do not reread

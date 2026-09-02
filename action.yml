@@ -50,8 +50,10 @@ inputs:
 outputs:
   status:
     description: >
-      quiet (nothing merged) | seated (a first session, no range yet) | staged (no agent
-      available, or it did not deliver — left for a human) | spoke (the workspace changed)
+      quiet (nothing merged) | pending (session: local — prepared, work order left on the
+      branch, nothing called out) | staged (session: hosted but no agent available, or it did
+      not deliver — left for a human the same way) | seated (a first hosted session ran) |
+      spoke (a hosted session ran)
     value: ${{ steps.run.outputs.status }}
   branch:
     description: "The advocate's branch."

@@ -47,10 +47,12 @@ jobs:
           advocate: upkeep
           push: "false"
 
-      - name: The first run staged, and did not invent a range
+      - name: The first run stayed local, and did not invent a range
         run: |
-          test "${{ steps.first.outputs.status }}" = "staged" \
-            || { echo "expected status=staged, got '${{ steps.first.outputs.status }}'"; exit 1; }
+          # `upkeep` declares session: local, so this must NOT call out even though a
+          # credential is reachable from the org — that is the whole point of the switch.
+          test "${{ steps.first.outputs.status }}" = "pending" \
+            || { echo "expected status=pending, got '${{ steps.first.outputs.status }}'"; exit 1; }
           test "${{ steps.first.outputs.commits }}" = "0" \
             || { echo "a first session has no range; got ${{ steps.first.outputs.commits }} commit(s)"; exit 1; }
           test "${{ steps.first.outputs.branch }}" = "advocate/upkeep" \
@@ -58,6 +60,9 @@ jobs:
           git rev-parse --verify advocate/upkeep >/dev/null
           git show advocate/upkeep:state.json
           git ls-tree -r --name-only advocate/upkeep
+          git cat-file -e advocate/upkeep:sessions/PENDING.md \
+            || { echo "a local session left no work order"; exit 1; }
+          echo "--- the work order ---"; git show advocate/upkeep:sessions/PENDING.md
 
       - name: The workspace is an orphan and main never learned about it
         run: |
@@ -120,6 +125,15 @@ jobs:
           echo "--- POSITION.md ---"; git show advocate/legibility:POSITION.md
           echo; echo "--- COMPLAINTS.md ---"; git show advocate/legibility:COMPLAINTS.md
           echo; echo "--- tree ---"; git ls-tree -r --name-only advocate/legibility
+
+      - name: pending.mjs finds the order from the branch alone
+        run: |
+          node bin/pending.mjs
+          node bin/pending.mjs --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+            const o=JSON.parse(s);
+            if(!o.some(x=>x.advocate==="upkeep")) { console.error("pending did not find upkeep"); process.exit(1); }
+            console.log("pending sees:", o.map(x=>x.advocate).join(", "));
+          })'
 
       - name: A config that cannot be read stops the council
         run: |

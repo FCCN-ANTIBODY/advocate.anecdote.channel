@@ -10,7 +10,17 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parse } from './yaml-enough.mjs';
+
+// Am I the entry point? Compare REALPATHS: on macOS /tmp is a symlink to /private/tmp, so a
+// naive `import.meta.url === file://${process.argv[1]}` is true on Linux and false on a Mac —
+// which would silently break exactly the local path this is meant to serve.
+const isMain = (url) => {
+  if (!process.argv[1]) return false;
+  try { return fs.realpathSync(fileURLToPath(url)) === fs.realpathSync(process.argv[1]); }
+  catch { return false; }
+};
 
 const CANDIDATES = ['advocate.yml', 'advocate.yaml', '.github/advocate.yml'];
 
@@ -43,6 +53,13 @@ export function loadConfig(root = process.cwd()) {
     if (typeof a.constituency !== 'string' || a.constituency.trim() === '') {
       die(`${where}: ${a.name} has no constituency — a brief nobody wrote is the one input that cannot be inherited`);
     }
+    // Where a session RUNS is declared here, never inferred from whether a credential
+    // happens to exist. `local` is the default: adding an org-wide key must not silently
+    // switch every repo that mounts this onto a paid, cloud-bound path.
+    const session = a.session ?? cfg.session ?? 'local';
+    if (session !== 'local' && session !== 'hosted') {
+      die(`${where}: ${a.name}: session must be 'local' or 'hosted' (got ${JSON.stringify(session)})`);
+    }
     const writes = a.writes == null ? [] : a.writes;
     if (!Array.isArray(writes)) die(`${where}: ${a.name}: writes must be a list (use [] for none)`);
     // The grant parses, but nothing acts on it yet: the pull-request step is unbuilt. A key
@@ -55,6 +72,7 @@ export function loadConfig(root = process.cwd()) {
       ...a,
       branch: a.branch || `advocate/${a.name}`,
       cadence: a.cadence || 'weekly',
+      session,
       writes,
       constitution: a.constitution ?? cfg.constitution ?? null,
       goals: Array.isArray(a.goals) ? a.goals : [],
@@ -64,11 +82,11 @@ export function loadConfig(root = process.cwd()) {
   return { file: path.relative(root, found), ...cfg };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMain(import.meta.url)) {
   const cfg = loadConfig();
   const args = process.argv.slice(2);
   if (args[0] === '--matrix') {
-    console.log(JSON.stringify({ include: cfg.advocates.map(({ name, branch, cadence }) => ({ name, branch, cadence })) }));
+    console.log(JSON.stringify({ include: cfg.advocates.map(({ name, branch, cadence, session }) => ({ name, branch, cadence, session })) }));
   } else if (args[0] === '--seat') {
     const seat = cfg.advocates.find((a) => a.name === args[1]);
     if (!seat) die(`no advocate named ${JSON.stringify(args[1])}`);

@@ -19,6 +19,8 @@ mission: >
 
 advocates:
   - name: upkeep
+    # local (the default): prepare the work, leave a work order, never call out. See LOCAL.md.
+    session: local
     mission: What this costs the person who has to keep it alive.
     # A sub-constitution: one section of the text above, not the whole of it.
     constitution: "#caretaking"
@@ -43,6 +45,9 @@ advocates:
       - Anything that needs a second repository in the checkout.
 
   - name: legibility
+    # hosted: opt in to running unattended over the API, at cost, with the repository's
+    # contents leaving for an inference provider. Never the default; always a decision.
+    session: hosted
     mission: Could the next operator copy this and understand what they copied?
     cadence: weekly
     writes: []                    # NOT WIRED YET — a non-empty grant is refused until the

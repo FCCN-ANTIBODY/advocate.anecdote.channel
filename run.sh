@@ -45,14 +45,31 @@ if [ "$quiet" = "true" ]; then
   exit 0
 fi
 
-# 2. Is a session summonable at all? Probe first, so "no credential" degrades to a staged
+# 2. LOCAL is the declared path: prepare the work, post the order, and never reach for an
+#    API — even if a credential is sitting right there. The expensive, cloud-bound half is
+#    something a repository OPTS INTO by saying so in advocate.yml, not something that starts
+#    happening because a key appeared in the org.
+mode=$(node "$here/bin/seats.mjs" --seat "$name" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).session))')
+
+if [ "$mode" = "local" ]; then
+  node "$here/bin/order.mjs" "$name" "$work" "$session" "$here"
+  if [ "$first" = "true" ]; then
+    commit_and_push "$name: seated at $(git rev-parse --short "$ref") — work order open for a local session"
+  else
+    commit_and_push "$name: $count commit(s) to read — work order open for a local session"
+  fi
+  out status pending
+  exit 0
+fi
+
+# 3. Is a session summonable at all? Probe first, so "no credential" degrades to a staged
 #    session for a human rather than a faked one. Any adapter honoring the stdin/stdout
 #    contract can stand behind ADVOCATE_AGENT_CMD; the bundled one talks to the Messages API.
 export ANTHROPIC_API_KEY="${ADVOCATE_AGENT_KEY:-${ANTHROPIC_API_KEY:-}}"
 cmd="${ADVOCATE_AGENT_CMD:-$here/bin/advocate-agent}"
 
 if ! $cmd --available >/dev/null 2>&1; then
-  echo "$session" > "$work/sessions/.pending.json"
+  node "$here/bin/order.mjs" "$name" "$work" "$session" "$here"
   if [ "$first" = "true" ]; then
     commit_and_push "$name: seated at $(git rev-parse --short "$ref") — no agent available"
   else
@@ -62,7 +79,7 @@ if ! $cmd --available >/dev/null 2>&1; then
   exit 0
 fi
 
-# 3. Summon the session. It receives the method, its seat, the range, and its own current
+# 4. Summon the session. It receives the method, its seat, the range, and its own current
 #    files — and nothing else. It returns four whole documents; this script writes them.
 agent_in="$(jq -n \
   --rawfile method "${ADVOCATE_METHOD:-$here/METHOD.md}" \
@@ -78,7 +95,7 @@ raw="$(printf '%s' "$agent_in" | $cmd || true)"
 if ! printf '%s' "$raw" | jq -e '.position and .complaints and .asks and .session' >/dev/null 2>&1; then
   # The agent was available and did not deliver. That is a not-available state too: stage
   # it for a human rather than write half a session.
-  echo "$session" > "$work/sessions/.pending.json"
+  node "$here/bin/order.mjs" "$name" "$work" "$session" "$here"
   commit_and_push "$name: staged $count commit(s) — the session did not return"
   out status staged
   exit 1
@@ -88,7 +105,7 @@ printf '%s' "$raw" | jq -r '.position'   > "$work/POSITION.md"
 printf '%s' "$raw" | jq -r '.complaints' > "$work/COMPLAINTS.md"
 printf '%s' "$raw" | jq -r '.asks'       > "$work/ASKS.md"
 printf '%s' "$raw" | jq -r '.session'    > "$work/sessions/$(date -u +%Y-%m-%d).md"
-rm -f "$work/sessions/.pending.json"
+rm -f "$work/sessions/PENDING.md" "$work/sessions/.pending.json"
 
 if [ "$first" = "true" ]; then
   commit_and_push "$name: seated $(date -u +%Y-%m-%d) — opening position"
