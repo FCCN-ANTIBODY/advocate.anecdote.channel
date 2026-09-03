@@ -112,8 +112,12 @@ rm -f "$work/sessions/PENDING.md" "$work/sessions/.pending.json"
 
 # Resolution for whoever is watching: how much is still forming, and how much is asking to move.
 # Drafts are progress, not debt — surfacing them is the point (STATUS.md).
-drafts=$(grep -rho 'status: draft' "$work" 2>/dev/null | wc -l | tr -d ' ')
-ready=$(grep -rho 'status: ready' "$work" 2>/dev/null | wc -l | tr -d ' ')
+# A seat with none of something is the NORMAL case, and grep says so by exiting 1.
+# Under `set -o pipefail` that kills the round between `git add` and the commit — the
+# work is staged and then thrown away, which is the worst of the three outcomes and
+# looks exactly like the agent having done nothing.
+drafts=$({ grep -rho 'status: draft' "$work" 2>/dev/null || true; } | wc -l | tr -d ' ')
+ready=$({ grep -rho 'status: ready' "$work" 2>/dev/null || true; } | wc -l | tr -d ' ')
 out drafts "$drafts"
 out ready "$ready"
 
