@@ -8,6 +8,12 @@
 
 version: 1
 
+# Optional. Where the council's one readable page is published. The default is the line
+# below; `report: false` publishes nothing. Every destination is a git push.
+report:
+  branch: council     # an orphan branch of this repo, rewritten whole each round
+  wiki: false         # also the repo's wiki — opt-in; it needs one page to exist first
+
 # Optional. Where this repo binds its caretakers, if it does. Absent is normal — there is no
 # master constitution for caretakers, and a mission below is a complete standard on its own.
 # constitution: CONSTITUTION.md

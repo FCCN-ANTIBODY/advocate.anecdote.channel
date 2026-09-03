@@ -5,6 +5,24 @@
 
 version: 1
 
+# Optional. Where the council's ONE readable page goes — every seat, when it last spoke, what
+# is still forming, what is asking to graduate. Rewritten whole each round; there is no
+# archive, because a report's value is that it is current and the history is in the branch.
+#
+# Every destination here is a git push. No issue is opened, no discussion filed, no REST call
+# made: a second surface is a second thing that can be stale while the repository is fine.
+report:
+  # An ORPHAN branch of this repo holding one README.md, so /tree/council renders it. Never
+  # merged — a generated page in main churns the default branch every round, and every
+  # submodule pin pointing here would then look stale when nothing changed.
+  branch: council
+  # The repo's wiki, which is a git repository too (<origin>.wiki.git). Opt-in for a
+  # mechanical reason: GitHub does not create it until a first page exists, so turning this
+  # on before opening the wiki once in a browser has no remote to push to.
+  wiki: false
+
+# `report: false` publishes nothing, and is a complete answer.
+
 # Optional. Where this repo binds its caretakers, if it does at all. Absent is normal and
 # means the missions below are the whole standard — there is no master constitution for
 # caretakers, on purpose (an advocate that cannot act needs no charter).

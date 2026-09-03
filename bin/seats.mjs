@@ -26,6 +26,30 @@ const CANDIDATES = ['advocate.yml', 'advocate.yaml', '.github/advocate.yml'];
 
 function die(msg) { console.error(`advocate: ${msg}`); process.exit(1); }
 
+// `report:` — where the council's one page is published. Optional; the default is a branch.
+//
+//   report: false                  publish nothing
+//   report:
+//     branch: council              a branch of THIS repo, holding one file, rewritten whole
+//     wiki: true                   also push it to <origin>.wiki.git as Home.md
+//
+// A branch is the default because it is a push and nothing else. The wiki is opt-in for a
+// mechanical reason worth stating: GitHub does not create the wiki's git repository until a
+// first page exists, so `wiki: true` on a repo whose wiki was never opened has no remote to
+// push to. That is a one-time click somebody has to make, and defaulting to it would mean
+// the framework's headline output failed on a fresh repo for a reason nothing explains.
+function resolveReport(r, where) {
+  if (r === undefined || r === null) return { branch: 'council', wiki: false };
+  if (r === false) return { branch: null, wiki: false };
+  if (typeof r !== 'object' || Array.isArray(r)) die(`${where}: report: must be a mapping, or false`);
+  const branch = r.branch === undefined ? 'council' : r.branch;
+  if (branch !== null && branch !== false && !(typeof branch === 'string' && /^[\w][\w./-]*$/.test(branch))) {
+    die(`${where}: report.branch must be a branch name, or false (got ${JSON.stringify(branch)})`);
+  }
+  if (r.wiki !== undefined && typeof r.wiki !== 'boolean') die(`${where}: report.wiki must be true or false`);
+  return { branch: branch === false ? null : branch, wiki: r.wiki === true };
+}
+
 export function loadConfig(root = process.cwd()) {
   const found = process.env.ADVOCATE_CONFIG
     ? path.resolve(process.env.ADVOCATE_CONFIG)
@@ -39,6 +63,11 @@ export function loadConfig(root = process.cwd()) {
   if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) die(`${found}: expected a mapping at the top level`);
   if (cfg.version !== 1) die(`${found}: version must be 1 (got ${JSON.stringify(cfg.version)})`);
   if (!Array.isArray(cfg.advocates) || cfg.advocates.length === 0) die(`${found}: advocates: must be a non-empty list`);
+
+  // Where the one readable page goes. A branch by default, because a branch is a push and
+  // nothing else — no API to keep honest, no second surface that can be stale while the
+  // repository is fine. `report: false` publishes nothing, which is a complete answer.
+  cfg.report = resolveReport(cfg.report, found);
 
   const seen = new Set();
   cfg.advocates = cfg.advocates.map((a, i) => {
@@ -79,6 +108,12 @@ export function loadConfig(root = process.cwd()) {
       'out-of-scope': Array.isArray(a['out-of-scope']) ? a['out-of-scope'] : [],
     };
   });
+
+  // The digest is written by the round, not by a seat. Letting it land on a seat's branch
+  // would put a generated page inside a workspace the seat is told it owns.
+  const clash = cfg.advocates.find((a) => a.branch === cfg.report.branch);
+  if (clash) die(`${found}: report.branch is ${JSON.stringify(cfg.report.branch)}, which is ${clash.name}'s workspace`);
+
   return { file: path.relative(root, found), ...cfg };
 }
 
@@ -87,6 +122,8 @@ if (isMain(import.meta.url)) {
   const args = process.argv.slice(2);
   if (args[0] === '--matrix') {
     console.log(JSON.stringify({ include: cfg.advocates.map(({ name, branch, cadence, session }) => ({ name, branch, cadence, session })) }));
+  } else if (args[0] === '--report') {
+    console.log(JSON.stringify(cfg.report));
   } else if (args[0] === '--seat') {
     const seat = cfg.advocates.find((a) => a.name === args[1]);
     if (!seat) die(`no advocate named ${JSON.stringify(args[1])}`);
