@@ -30,6 +30,23 @@ round that fired is not a round that spoke. The agent is swappable via
 default is the `claude` CLI at `ADVOCATE_MODEL` (default `sonnet`, because a caretaking
 session is reading, and the cheap one is the one you can afford weekly).
 
+## The workspace had to move out of `.git`, and that is the interesting finding
+
+The first real local session **died on its first write**, which is the best argument for
+having built this at all.
+
+`session.mjs` parks each seat's worktree at `.git/advocate-work/<seat>`, and the comment
+explains why: a workspace under the repo root gets swept into a stray `git add -A` and
+committed to `main`. That reason is sound. But Claude Code treats the entire `.git` directory
+as a sensitive path and refuses to write there — unattended, with nobody to approve it — so
+**the framework's headline story, "a local agent picks up the work order", could not be walked
+by the most likely local agent.** It had never been run, so nobody had found out.
+
+Outside the repo is the *stronger* version of the original guarantee: it cannot be committed
+to the subject by accident, because it is not in the subject. `session.mjs` honours
+`ADVOCATE_WORK_DIR` and is otherwise byte-identical in behaviour, so **CI is untouched** and
+keeps its `.git` default; `round.sh` sets it to `~/.local/state/advocate`.
+
 ## `bin/digest.mjs` + `bin/publish.sh` — the reporting gap
 
 A branch per seat is right for the work and **wrong for the reader**. Nobody checks out five
