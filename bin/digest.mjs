@@ -63,10 +63,13 @@ function seatState(seat) {
   try { state = JSON.parse(read('state.json') || '{}'); } catch { /* a seat mid-flight is not an error */ }
 
   const all = [];
+  const docs = {};
   for (const f of ['POSITION.md', 'COMPLAINTS.md', 'ASKS.md']) {
     const t = read(f);
+    docs[f] = t || '';
     if (t) all.push(...items(t).map((i) => ({ ...i, file: f })));
   }
+  const note = last ? read(`sessions/${last}.md`) : null;
   const tally = Object.fromEntries(LADDER.map((s) => [s, all.filter((i) => i.status === s).length]));
   tally.promoted = all.filter((i) => i.status === 'promoted').length;
 
@@ -78,6 +81,7 @@ function seatState(seat) {
     owed: read('sessions/PENDING.md') !== null,
     tally,
     ready: all.filter((i) => i.status === 'ready'),
+    docs, note,
   };
 }
 
@@ -88,8 +92,6 @@ const today = new Date().toISOString().slice(0, 10);
 
 function render() {
   const L = [];
-  const link = (s, f) => (repo ? `https://github.com/${repo}/blob/${s.branch}/${f}` : `${s.branch}:${f}`);
-
   L.push(`# The council${repo ? ` — ${repo.split('/')[1]}` : ''}`, '');
   L.push('**Where every seat stands, as of the last round.** Rewritten whole each time: this page is a');
   L.push("position, not a log. Each seat's own history is its branch, which is the receipt.", '');
@@ -100,7 +102,7 @@ function render() {
   for (const s of seats) {
     if (!s.seated) { L.push(`| \`${s.name}\` | — | — | — | — | not seated yet |`); continue; }
     const state = s.owed ? '**session owed**' : s.last_session ? 'up to date' : 'seated, has not spoken';
-    const name = repo ? `[\`${s.name}\`](${link(s, 'POSITION.md')})` : `\`${s.name}\``;
+    const name = `[\`${s.name}\`](${pageLink(s)})`;
     L.push(`| ${name} | ${s.last_session || '—'} | ${s.sessions} | ${s.tally.draft} | ${s.tally.ready} | ${state} |`);
   }
   L.push('');
@@ -145,8 +147,81 @@ function render() {
   return L.join('\n') + '\n';
 }
 
+// --- the hub -----------------------------------------------------------------------------
+// One page per seat, carrying the seat's ACTUAL DOCUMENTS, not a link to them. The index by
+// itself only relocates the problem: you still end up opening a branch per seat to read a
+// finding, and a hub you have to leave in order to learn anything is not a hub.
+//
+// Still rewritten whole. These pages are copies of the current state of each branch, which is
+// the authority; nothing here is edited by hand and nothing accumulates.
+//
+// Two flavours of the same hub, because they are addressed differently:
+//   wiki    Home.md + _Sidebar.md + `Seat-<name>.md`. GitHub derives a page's URL from its
+//           filename, collapsing every run of non-word characters to one dash.
+//   branch  README.md + `<name>.md`, sitting in one directory listing. This is the default
+//           and it needs NOTHING turned on — /tree/council renders the index and the seat
+//           pages are right there beside it.
+const FLAVOR = (() => { const i = process.argv.indexOf('--as'); return i > -1 ? process.argv[i + 1] : 'branch'; })();
+const HUB = process.argv.includes('--pages');
+const pageFile = (s) => (FLAVOR === 'wiki' ? `Seat-${s.name}.md` : `${s.name}.md`);
+// Off the hub there is no sibling page to point at, so the index links where the thing
+// actually lives. A relative link that resolves to nothing is worse than a long URL.
+const pageLink = (s) => (HUB ? (FLAVOR === 'wiki' ? `Seat-${s.name}` : `${s.name}.md`)
+  : repo ? `https://github.com/${repo}/blob/${s.branch}/POSITION.md` : `${s.branch}:POSITION.md`);
+const title = (s) => `Seat · ${s.name}`;
+
+function seatPage(s) {
+  const L = [`# ${title(s)}`, ''];
+  if (!s.seated) {
+    L.push('Declared in `advocate.yml` and never run. A seat exists once it has spoken; until then it', 'is an intention.', '');
+    return L.join('\n') + '\n';
+  }
+  L.push(`\`${s.branch}\` · last spoke **${s.last_session || 'never'}** · ${s.sessions} session(s) · ` +
+         `${s.tally.draft} draft · ${s.tally.ready} ready${s.owed ? ' · **session owed**' : ''}`, '');
+  L.push('<sub>Copied whole from the branch, which is the authority. Do not edit this page — it is', 'overwritten every round.</sub>', '');
+  for (const [f, heading] of [['POSITION.md', 'Position'], ['COMPLAINTS.md', 'Complaints'], ['ASKS.md', 'Asks']]) {
+    const body = (s.docs?.[f] || '').trim();
+    L.push(`## ${heading}`, '');
+    L.push(body ? body.replace(/^#\s+/gm, '### ') : `_Nothing in \`${f}\` yet._`, '');
+  }
+  if (s.note) { L.push(`## Last session note — ${s.last_session}`, '', s.note.trim().replace(/^#\s+/gm, '### '), ''); }
+  return L.join('\n') + '\n';
+}
+
+function sidebar() {
+  const L = ['**[The council](Home)**', ''];
+  for (const s of seats) {
+    const mark = !s.seated ? ' <sub>unseated</sub>' : s.owed ? ' <sub>owed</sub>' : '';
+    L.push(`- [${s.name}](${pageLink(s)})${mark}`);
+  }
+  return L.join('\n') + '\n';
+}
+
+const pagesAt = process.argv.indexOf('--pages');
 const out = render();
 const w = process.argv.indexOf('--write');
+
 if (process.argv.includes('--json')) console.log(JSON.stringify({ repo, generated: today, seats }, null, 2));
+else if (pagesAt > -1) {
+  // GitHub wikis derive a page's URL from its FILENAME, turning every run of non-word
+  // characters into a single dash. Generate the filename the same way rather than guessing,
+  // or every sidebar link 404s in a way that looks like the page failed to write.
+  const dir = process.argv[pagesAt + 1];
+  fs.mkdirSync(dir, { recursive: true });
+  const home = FLAVOR === 'wiki' ? 'Home.md' : 'README.md';
+  fs.writeFileSync(`${dir}/${home}`, out);
+  const keep = new Set([home]);
+  if (FLAVOR === 'wiki') { fs.writeFileSync(`${dir}/_Sidebar.md`, sidebar()); keep.add('_Sidebar.md'); }
+  for (const s of seats) {
+    keep.add(pageFile(s));
+    fs.writeFileSync(`${dir}/${pageFile(s)}`, seatPage(s));
+  }
+  // A seat that was removed from advocate.yml leaves a page behind that will otherwise sit
+  // there forever looking current. The hub reflects the config; it does not accumulate.
+  for (const f of fs.readdirSync(dir)) {
+    if (f.endsWith('.md') && !keep.has(f)) { fs.rmSync(`${dir}/${f}`); console.error(`advocate: retired hub page ${f}`); }
+  }
+  console.error(`advocate: ${keep.size} hub page(s) written to ${dir}`);
+}
 else if (w > -1) { fs.writeFileSync(process.argv[w + 1], out); console.error(`advocate: digest written to ${process.argv[w + 1]}`); }
 else process.stdout.write(out);
