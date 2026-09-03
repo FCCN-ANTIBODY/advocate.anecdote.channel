@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # round.sh — one whole council round for THIS repository, on this machine.
 #
-#   bin/round.sh [--no-fetch] [--dry-run] [--seat <name>]
+#   bin/round.sh [--no-fetch] [--dry-run] [--seat <name>] [--max <n>]
 #
 # `run.sh` is one seat's mechanical half and is what CI calls. This is the operator-side
 # loop LOCAL.md describes in prose: fetch, run every seat, hand each open work order to a
@@ -20,12 +20,13 @@ set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 root="$(git rev-parse --show-toplevel)"
-fetch=true; dry=false; only=""
+fetch=true; dry=false; only=""; max="${ADVOCATE_MAX_SEATS:-0}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-fetch) fetch=false ;;
     --dry-run)  dry=true ;;
     --seat)     only="${2:?--seat needs a name}"; shift ;;
+    --max)      max="${2:?--max needs a number}"; shift ;;
     -h|--help)  sed -n '2,12p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "round: unknown argument $1" >&2; exit 2 ;;
   esac
@@ -66,16 +67,50 @@ if [ "$dry" = true ]; then
 fi
 
 # ---------------------------------------------------------------------------------------
-# 1. The mechanical half, per seat. Costs nothing, needs no credential, calls nothing out.
-#    run.sh is reused rather than reimplemented so CI and this path cannot drift apart.
+# 1. Choose who runs. THE ROUND IS A BUDGET, not a sweep.
+#
+#    A session is minutes of somebody's real attention, and a council of nine seats across
+#    four repositories is an hour of it every time the clock fires — which is how a cadence
+#    stops being affordable and then stops being kept. So a round serves at most --max seats
+#    and the rest wait. Nothing is lost by waiting: the range is cumulative, so a seat served
+#    two rounds from now reads everything it would have read today.
+#
+#    STALEST FIRST, so the queue rotates and no seat starves. Never spoken outranks spoken
+#    long ago, which outranks spoken recently.
+#
+#    Selection is READ-ONLY — digest.mjs looks at branches and prepares nothing. That matters:
+#    the mechanical half advances the pin, so preparing every seat in order to pick one would
+#    spend the range of the seats that did not get picked.
 # ---------------------------------------------------------------------------------------
-for name in $seats; do
-  [ -z "$only" ] || [ "$only" = "$name" ] || continue
+chosen=$(node "$here/bin/digest.mjs" --json | node -e '
+  let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
+    const {seats}=JSON.parse(s);
+    const only=process.argv[1], max=Number(process.argv[2]||0);
+    let pool = only ? seats.filter(x=>x.name===only) : seats;
+    // A seat carrying a standing order was already interrupted once; it goes first.
+    const rank = (x) => (x.owed ? 0 : 1) * 1e12
+      + (!x.seated || !x.last_session ? 0 : Date.parse(x.last_session));
+    pool = pool.sort((a,b)=>rank(a)-rank(b) || a.name.localeCompare(b.name));
+    if (max > 0) pool = pool.slice(0, max);
+    process.stdout.write(pool.map(x=>x.name).join("\n"));
+  });' "$only" "$max")
+
+[ -n "$chosen" ] || { say "no seats to serve"; bash "$here/bin/publish.sh" || true; exit 0; }
+
+waiting=$(( $(echo "$seats" | grep -c .) - $(echo "$chosen" | grep -c .) ))
+[ "$waiting" -le 0 ] || say "serving $(echo "$chosen" | tr '\n' ' ')— $waiting seat(s) wait for the next round"
+
+# ---------------------------------------------------------------------------------------
+# 2. The mechanical half, for the chosen only. Costs nothing, needs no credential, calls
+#    nothing out. run.sh is reused rather than reimplemented so CI and this path cannot
+#    drift apart.
+# ---------------------------------------------------------------------------------------
+for name in $chosen; do
   ADVOCATE_PUSH="${ADVOCATE_PUSH:-true}" bash "$here/run.sh" "$name" HEAD >/dev/null || say "$name: mechanical half failed"
 done
 
 # ---------------------------------------------------------------------------------------
-# 2. The judgement half. Only for seats carrying an open order — a seat whose range was
+# 3. The judgement half. Only for seats carrying an open order — a seat whose range was
 #    empty already wrote its one line and is not owed anything.
 # ---------------------------------------------------------------------------------------
 owed=$(node "$here/bin/pending.mjs" --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).map(o=>o.advocate).join("\n")))')
@@ -84,7 +119,7 @@ if [ -z "$owed" ]; then
   say "nothing owed"
 else
   for name in $owed; do
-    [ -z "$only" ] || [ "$only" = "$name" ] || continue
+    echo "$chosen" | grep -qx "$name" || continue
     work="$(node "$here/bin/session.mjs" "$name" --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).workspace))')"
 
     say "$name: summoning a local session"
