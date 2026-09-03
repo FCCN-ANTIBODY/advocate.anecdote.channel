@@ -55,6 +55,16 @@ fi
 seats=$(node "$here/bin/seats.mjs" --matrix | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).include.map(x=>x.name).join("\n")))')
 [ -n "$seats" ] || { say "no seats declared"; exit 0; }
 
+# A dry run READS AND STOPS. It does not prepare a workspace, advance a pin, or push — those
+# are not "harmless mechanical steps", they are the session's baseline moving. A --dry-run
+# that quietly advanced the pin would mean the range a seat was supposed to read had been
+# spent by the command you ran to find out whether it had anything to read.
+if [ "$dry" = true ]; then
+  node "$here/bin/pending.mjs"
+  node "$here/bin/digest.mjs"
+  exit 0
+fi
+
 # ---------------------------------------------------------------------------------------
 # 1. The mechanical half, per seat. Costs nothing, needs no credential, calls nothing out.
 #    run.sh is reused rather than reimplemented so CI and this path cannot drift apart.
@@ -76,8 +86,6 @@ else
   for name in $owed; do
     [ -z "$only" ] || [ "$only" = "$name" ] || continue
     work="$(node "$here/bin/session.mjs" "$name" --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).workspace))')"
-
-    if [ "$dry" = true ]; then say "$name: owed a session; workspace $work (dry run)"; continue; fi
 
     say "$name: summoning a local session"
     prompt="You are the advocate \`$name\`, seated in $(basename "$root").
@@ -139,5 +147,4 @@ fi
 # ---------------------------------------------------------------------------------------
 # 3. The one page anyone reads. Rewritten whole; never appended to.
 # ---------------------------------------------------------------------------------------
-[ "$dry" = true ] || bash "$here/bin/publish.sh" || say "digest not published"
-node "$here/bin/digest.mjs"
+bash "$here/bin/publish.sh" || say "digest not published"

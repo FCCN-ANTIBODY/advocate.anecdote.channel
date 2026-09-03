@@ -14,6 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { loadConfig } from './seats.mjs';
 
 const git = (...a) => execFileSync('git', a, { encoding: 'utf8' }).trimEnd();
@@ -45,16 +46,30 @@ const root = git('rev-parse', '--show-toplevel');
 //
 // A path OUTSIDE the subject repo satisfies the original constraint more strongly than `.git`
 // ever did: it cannot be swept into a commit on the subject, because it is not in the subject.
+// Keyed by the CHECKOUT, not by the repository's name. Two clones of the same repo on one
+// machine — a worktree, a scratch copy, the same project cloned twice — would otherwise share
+// a workspace path, and the second one to run would try to remove a worktree registered to the
+// first. That is a data-loss shape, not an inconvenience.
 const gitDir = git('rev-parse', '--git-common-dir').replace(/^(?!\/)/, root + '/');
 const work = process.env.ADVOCATE_WORK_DIR
-  ? path.resolve(process.env.ADVOCATE_WORK_DIR, path.basename(root), seat.name)
+  ? path.resolve(process.env.ADVOCATE_WORK_DIR,
+      `${path.basename(root)}-${createHash('sha1').update(root).digest('hex').slice(0, 7)}`,
+      seat.name)
   : path.join(gitDir, 'advocate-work', seat.name);
 const head = git('rev-parse', subjectRef);
 const today = new Date().toISOString().slice(0, 10);
 
 // --- the workspace, as a worktree on the advocate's own branch --------------------------
 fs.mkdirSync(path.dirname(work), { recursive: true });
-if (fs.existsSync(work)) execFileSync('git', ['worktree', 'remove', '--force', work], { stdio: 'ignore' });
+// Tolerant on purpose. `worktree remove` fails when the path is registered to a DIFFERENT
+// repository, or to no repository at all — a leftover from a run that was interrupted, or
+// from a sibling checkout. Neither is a reason to abort a session: clear the path, prune the
+// stale registration, and carry on. Crashing here strands every seat behind it.
+if (fs.existsSync(work)) {
+  try { execFileSync('git', ['worktree', 'remove', '--force', work], { stdio: 'ignore' }); }
+  catch { fs.rmSync(work, { recursive: true, force: true }); }
+  execFileSync('git', ['worktree', 'prune'], { stdio: 'ignore' });
+}
 
 const exists = gitQuiet('rev-parse', '--verify', `refs/heads/${seat.branch}`)
   || gitQuiet('rev-parse', '--verify', `refs/remotes/origin/${seat.branch}`);
