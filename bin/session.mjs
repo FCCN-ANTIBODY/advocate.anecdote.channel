@@ -74,13 +74,19 @@ if (fs.existsSync(work)) {
 const exists = gitQuiet('rev-parse', '--verify', `refs/heads/${seat.branch}`)
   || gitQuiet('rev-parse', '--verify', `refs/remotes/origin/${seat.branch}`);
 
+// --force, because a workspace is DISPOSABLE and the branch is the durable thing. Without it,
+// a worktree registered at any other path still holding this branch — a leftover from an
+// interrupted run, or from before the workspace location changed — blocks the session
+// permanently, and the seat can never run again without someone finding and pruning it by
+// hand. Anything uncommitted in such a leftover is by definition a session that already
+// failed; the branch it was cut from is untouched, and that is what is being re-checked-out.
 if (exists) {
   const start = gitQuiet('rev-parse', '--verify', `refs/heads/${seat.branch}`)
     ? seat.branch : `origin/${seat.branch}`;
-  git('worktree', 'add', '--quiet', '-B', seat.branch, work, start);
+  git('worktree', 'add', '--quiet', '--force', '-B', seat.branch, work, start);
 } else {
   // First run: an orphan, so the workspace carries none of main's tree or history.
-  git('worktree', 'add', '--quiet', '--detach', work, head);
+  git('worktree', 'add', '--quiet', '--force', '--detach', work, head);
   execFileSync('git', ['-C', work, 'checkout', '--orphan', seat.branch], { stdio: 'ignore' });
   execFileSync('git', ['-C', work, 'rm', '-rq', '--cached', '.'], { stdio: 'ignore' });
   for (const e of fs.readdirSync(work)) if (e !== '.git') fs.rmSync(path.join(work, e), { recursive: true, force: true });
