@@ -165,8 +165,12 @@ that. Do not touch anything under $root outside your workspace."
     if git -C "$work" diff --cached --quiet; then
       say "$name: agent changed nothing"
     else
-      drafts=$(grep -rho 'status: draft' "$work" 2>/dev/null | wc -l | tr -d ' ')
-      ready=$(grep -rho 'status: ready' "$work" 2>/dev/null | wc -l | tr -d ' ')
+# A seat with none of something is the NORMAL case, and grep says so by exiting 1.
+      # Under `set -o pipefail` that kills the round between `git add` and the commit — the
+      # work is staged and then thrown away, which is the worst of the three outcomes and
+      # looks exactly like the agent having done nothing.
+      drafts=$({ grep -rho 'status: draft' "$work" 2>/dev/null || true; } | wc -l | tr -d ' ')
+      ready=$({ grep -rho 'status: ready' "$work" 2>/dev/null || true; } | wc -l | tr -d ' ')
       git -C "$work" commit -qm "$name: session $today — $drafts draft(s), $ready ready"
       if [ "${ADVOCATE_PUSH:-true}" = "true" ]; then
         git -C "$work" push -q origin "HEAD:refs/heads/$(git -C "$work" rev-parse --abbrev-ref HEAD)" \
