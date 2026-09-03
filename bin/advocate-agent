@@ -88,6 +88,10 @@ body="$(jq -n --arg model "$model" --arg system "$system" --arg effort "$effort"
     ) } ]
   }')"
 
+# bash 3.2 — which is what macOS ships — treats "${arr[@]}" on an EMPTY array as an unbound
+# variable under `set -u` and dies. Every optional-header array here is empty in the common
+# case, so the guarded form is not a style preference: without it this adapter cannot run on a
+# Mac at all. Ubuntu runners have bash 5 and never show it.
 wsargs=()
 [ -n "$workspace" ] && wsargs=(-H "anthropic-workspace-id: $workspace")
 
@@ -96,7 +100,7 @@ response="$(printf '%s' "$body" | curl -sS "$url" \
   -H "x-api-key: $api_key" \
   -H "anthropic-version: 2023-06-01" \
   -H "anthropic-beta: server-side-fallback-2026-07-01" \
-  "${wsargs[@]}" \
+  ${wsargs[@]+"${wsargs[@]}"} \
   --data-binary @- )"
 
 if [ "$(printf '%s' "$response" | jq -r '.type // ""')" = "error" ]; then

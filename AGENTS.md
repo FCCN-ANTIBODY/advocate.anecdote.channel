@@ -10,6 +10,7 @@ repository, it belongs in *that* repository's `advocate.yml`, not here.
 | What is an advocate supposed to do? | [`METHOD.md`](METHOD.md) — the whole loop, written to hand to an agent |
 | What does the config look like? | [`advocate.example.yml`](advocate.example.yml) |
 | How do I run it without an API, or without cost? | [`LOCAL.md`](LOCAL.md) — the default path, and the routine prompt |
+| Which provider does a hosted session call? | [`BACKEND.md`](BACKEND.md) — declared, not inferred; and the adapter contract |
 | How do I mount this? | [`README.md`](README.md) → Mounting |
 | What does the action take? | [`action.yml`](action.yml) |
 | What does a consumer copy? | [`skel/`](skel/) |
@@ -27,6 +28,9 @@ repository, it belongs in *that* repository's `advocate.yml`, not here.
 5. **Where a session runs is declared, not inferred.** `session: local` is the default and never
    calls an API even when a credential is present; `hosted` is an opt-in. A key appearing in the
    org must not silently start spending money in every repo that mounts this.
+6. **And so is WHAT it calls.** `backend:` names the provider, and absent means the bundled
+   Anthropic adapter. An org secret named for a role — "the key that summons a session" — must not
+   silently choose a vendor. A local model is a `url:`, not a fork.
 
 ## Tests
 

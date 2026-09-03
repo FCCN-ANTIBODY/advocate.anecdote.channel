@@ -30,6 +30,9 @@ assert.equal(g.out.advocates[0].cadence, 'weekly');
 assert.deepEqual(g.out.advocates[0].writes, [], 'honest defaults fire nothing');
 assert.equal(g.out.advocates[0].session, 'local', 'a session is local until a repo opts out');
 assert.deepEqual(g.out.report, { branch: 'council', wiki: false }, 'the digest has a home by default');
+// Absent means exactly today's behaviour, so nothing that works now changes.
+assert.equal(g.out.backend, null, 'a repo that declares no backend declares nothing');
+assert.equal(g.out.advocates[0].backend, null);
 
 // A repo that wants no page at all says so, and that is a complete answer.
 assert.deepEqual(run(`version: 1\nreport: false\n${good.split('\n').slice(1).join('\n')}`).out.report,
@@ -40,6 +43,25 @@ assert.deepEqual(run(`version: 1\nreport:\n  branch: board\n  wiki: true\n${good
 // inherits the repo-level constitution when the seat names none
 const inherit = run(`version: 1\nconstitution: CONSTITUTION.md\n${good.split('\n').slice(1).join('\n')}`);
 assert.equal(inherit.out.advocates[0].constitution, 'CONSTITUTION.md');
+
+// backend: WHAT a session calls, declared and not inferred (BACKEND.md)
+{
+  const b = run(`version: 1\nbackend:\n  kind: openai\n  url: http://127.0.0.1:11434/v1/chat/completions\n  key-env: ""\n${good.split('\n').slice(1).join('\n')}`);
+  assert.ok(b.ok, b.err);
+  assert.equal(b.out.backend.kind, 'openai');
+  assert.equal(b.out.backend.url, 'http://127.0.0.1:11434/v1/chat/completions');
+  // "" is a DECLARATION — this backend takes no credential — and must not be read as absent.
+  assert.equal(b.out.backend['key-env'], '', 'no credential is a supported state, not a missing one');
+  assert.equal(b.out.advocates[0].backend.kind, 'openai', 'seats inherit the repo backend');
+}
+// A seat may override it: one seat on a big model, another on a cheap local one.
+{
+  const y = `version: 1\nbackend:\n  kind: openai\nadvocates:\n  - name: a\n    mission: m\n    constituency: |\n      c\n  - name: b\n    mission: m\n    constituency: |\n      c\n    backend:\n      kind: anthropic\n      model: claude-opus-5\n`;
+  const o = run(y).out;
+  assert.equal(o.advocates[0].backend.kind, 'openai');
+  assert.equal(o.advocates[1].backend.kind, 'anthropic');
+  assert.equal(o.advocates[1].backend.model, 'claude-opus-5');
+}
 
 // refusals — each of these should stop the council rather than guess
 const refusals = [
@@ -58,6 +80,11 @@ const refusals = [
   ['version: 1\nreport:\n  branch: 3\nadvocates:\n  - name: a\n    mission: m\n    constituency: c\n', /report.branch must be/],
   ['version: 1\nreport:\n  wiki: yes please\nadvocates:\n  - name: a\n    mission: m\n    constituency: c\n', /report.wiki must be/],
   ['version: 1\nreport: council\nadvocates:\n  - name: a\n    mission: m\n    constituency: c\n', /report: must be a mapping/],
+  // A backend nobody can name is a typo that would fall through to the default adapter and
+  // look like it worked.
+  ['version: 1\nbackend:\n  kind: bedrock\nadvocates:\n  - name: a\n    mission: m\n    constituency: c\n', /backend.kind must be one of/],
+  ['version: 1\nbackend:\n  kind: command\nadvocates:\n  - name: a\n    mission: m\n    constituency: c\n', /no command: is given/],
+  ['version: 1\nbackend:\n  kind: openai\n  command: ./x\nadvocates:\n  - name: a\n    mission: m\n    constituency: c\n', /only applies to kind: command/],
 ];
 for (const [yaml, re] of refusals) {
   const r = run(yaml);

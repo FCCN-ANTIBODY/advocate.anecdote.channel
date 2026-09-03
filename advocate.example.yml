@@ -23,6 +23,31 @@ report:
 
 # `report: false` publishes nothing, and is a complete answer.
 
+# Optional. WHAT a session calls, when `session: hosted` below says it may call anything.
+# Absent means exactly today's behaviour (the Anthropic Messages API), so this changes nothing
+# for a config that omits it. Full reasoning: BACKEND.md.
+#
+# The rule is the same one `session:` follows, one level down: a credential appearing must never
+# decide behaviour. An org secret named for a ROLE — "the key that summons a session" — was
+# silently choosing a VENDOR, because the bundled adapter was the only one there was.
+backend:
+  kind: anthropic          # anthropic | openai | command
+  model: claude-opus-5
+  # url: …                 # override the endpoint. THIS IS HOW "LOCAL" HAPPENS.
+  # key-env: ADVOCATE_AGENT_KEY   # which variable holds the credential. "" = takes none.
+
+# A local model is a URL, not a fork — one adapter covers OpenAI, Azure, OpenRouter, vLLM,
+# llama.cpp, LM Studio and Ollama, because they all speak /chat/completions:
+#
+#   backend:
+#     kind: openai
+#     url: http://127.0.0.1:11434/v1/chat/completions
+#     model: qwen3:14b
+#     key-env: ""          # a backend that needs no credential cannot leak one
+#
+# There is no `kind: none`. `session: local` already says "never call out", and a second way to
+# spell it would be a second thing to keep honest.
+
 # Optional. Where this repo binds its caretakers, if it does at all. Absent is normal and
 # means the missions below are the whole standard — there is no master constitution for
 # caretakers, on purpose (an advocate that cannot act needs no charter).

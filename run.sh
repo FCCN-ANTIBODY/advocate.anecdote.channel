@@ -62,11 +62,49 @@ if [ "$mode" = "local" ]; then
   exit 0
 fi
 
-# 3. Is a session summonable at all? Probe first, so "no credential" degrades to a staged
-#    session for a human rather than a faked one. Any adapter honoring the stdin/stdout
-#    contract can stand behind ADVOCATE_AGENT_CMD; the bundled one talks to the Messages API.
-export ANTHROPIC_API_KEY="${ADVOCATE_AGENT_KEY:-${ANTHROPIC_API_KEY:-}}"
-cmd="${ADVOCATE_AGENT_CMD:-$here/bin/advocate-agent}"
+# 3. WHICH BACKEND, and is a session summonable at all?
+#
+#    The backend is DECLARED in advocate.yml, never inferred from which credential happens to
+#    exist — the same rule `session:` follows, one level down. An org secret named for a role
+#    ("the key that summons a session") must not silently choose a vendor just because the
+#    bundled adapter is the only one there is. See BACKEND.md.
+#
+#    Probe first, so "no credential" degrades to a staged session for a human rather than a
+#    faked one. Any adapter honoring the stdin/stdout contract can stand behind
+#    ADVOCATE_AGENT_CMD, which still wins over the declaration: it is the operator's override,
+#    and the config is the repository's default.
+backend="$(node "$here/bin/seats.mjs" --backend "$name")"
+bkind=$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).kind)' "$backend")
+bmodel=$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).model||"")' "$backend")
+burl=$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).url||"")' "$backend")
+bcmd=$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).command||"")' "$backend")
+bkeyenv=$(node -e 'process.stdout.write(JSON.parse(process.argv[1])["key-env"])' "$backend")
+
+# The declaration only fills what it actually said, so an environment override still works and a
+# repo that declares nothing behaves exactly as before.
+[ -z "$bmodel" ] || export ADVOCATE_MODEL="${ADVOCATE_MODEL:-$bmodel}"
+[ -z "$burl" ]   || export ADVOCATE_API_URL="${ADVOCATE_API_URL:-$burl}"
+export ADVOCATE_KEY_ENV="$bkeyenv"
+
+# `key-env: ""` means this backend takes NO credential — a local server, usually — and that is a
+# real declaration, not an omission. Honour it by passing nothing rather than reaching for a
+# fallback the repo did not ask for.
+if [ -n "$bkeyenv" ]; then
+  keyval="$(printenv "$bkeyenv" 2>/dev/null || true)"
+  [ -n "$keyval" ] || keyval="${ADVOCATE_AGENT_KEY:-}"
+else
+  keyval=""
+fi
+export ANTHROPIC_API_KEY="${keyval:-${ANTHROPIC_API_KEY:-}}"
+
+case "$bkind" in
+  anthropic) default_cmd="$here/bin/advocate-agent" ;;
+  openai)    default_cmd="$here/bin/advocate-agent-openai" ;;
+  command)   default_cmd="$bcmd" ;;
+  *)         default_cmd="$here/bin/advocate-agent" ;;
+esac
+cmd="${ADVOCATE_AGENT_CMD:-$default_cmd}"
+echo "advocate: backend $bkind${bmodel:+ ($bmodel)}${burl:+ at $burl}"
 
 if ! why="$($cmd --available 2>&1 >/dev/null)"; then
   # Say WHY it is unavailable. A silent "no agent" sends someone hunting for a missing key
