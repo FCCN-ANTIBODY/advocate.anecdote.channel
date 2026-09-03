@@ -24,8 +24,9 @@ npm test                              # node test/*.test.mjs
 ```
 
 `bin/session.mjs` needs only a git repository. It creates the advocate's branch as an **orphan**,
-checks it out as a worktree inside `.git/` (where a stray `git add -A` on the subject can never
-sweep it into `main`), and prints the first-parent commits merged since that advocate last ran.
+checks it out as a worktree — inside `.git/` by default, where a stray `git add -A` on the subject
+can never sweep it into `main`, or wherever `ADVOCATE_WORK_DIR` says — and prints the first-parent
+commits merged since that advocate last ran.
 
 Everything above works with the network off. The workflow in `skel/` is how this is *scheduled*, not
 how it *works* — a declarative definition of the loop, not the runtime it depends on.
@@ -105,15 +106,40 @@ advocate/upkeep
 allowed to be as big and as strange as it needs — a growing tree with reasons of its own, which is
 the thing a tidy folder in `main` would keep punishing.
 
+## A round is a budget, not a sweep
+
+A session is minutes of somebody's real attention. Nine seats across four repositories is an hour of
+it every time the clock fires, and that is how a cadence stops being affordable and then stops being
+kept at all.
+
+```sh
+node .advocate-engine/bin/round.sh --max 2
+```
+
+A round serves the **stalest** seats up to `--max` and the rest wait. **Waiting costs nothing** — a
+range is cumulative, so a seat served three rounds from now reads everything it would have read
+today. Seats carrying a standing work order go first, because they were already interrupted once.
+
+Selection is **read-only**, and that is load-bearing rather than tidy: the mechanical half advances
+the pin, so preparing every seat in order to choose one would spend the range of every seat that did
+not get chosen.
+
 ## One page you can actually find
 
 A branch per seat is right for the work and wrong for the reader: nobody checks out five branches
-to find out whether anything happened. So a round ends by rewriting **one page** — every seat, when
-it last spoke, what is still forming, and what is asking to graduate.
+to find out whether anything happened. So a round ends by rewriting a **hub** — an index of every
+seat, plus **a page per seat carrying that seat's actual documents**: its position, its complaints,
+its asks, its last session note.
+
+The index alone was not enough, and the reason is worth stating: a list of links only relocates the
+problem. You still open a branch per seat to read a finding, and **a hub you have to leave in order
+to learn anything is not a hub.** So the pages carry the text, copied whole from the branch, which
+remains the authority.
 
 ```sh
-node .advocate-engine/bin/digest.mjs            # to stdout
-node .advocate-engine/bin/publish.sh            # to wherever report: says
+node .advocate-engine/bin/digest.mjs                       # the index, to stdout
+node .advocate-engine/bin/digest.mjs --pages ./out --as branch
+node .advocate-engine/bin/publish.sh                       # to wherever report: says
 ```
 
 ```yaml
@@ -122,8 +148,9 @@ report:
   wiki: false          # opt-in; see below
 ```
 
-**The default destination is another branch**, holding one `README.md` so that visiting
-`/tree/council` renders it. It is orphaned and never merged, for the same reason a seat's branch is:
+**The default destination is another branch**, holding `README.md` and the seat pages beside it,
+so that visiting `/tree/council` renders the index with everything one click away and **nothing
+turned on**. It is orphaned and never merged, for the same reason a seat's branch is:
 a generated page in `main` churns the default branch every round, and every submodule pin pointing
 at that repo then looks stale when nothing changed.
 
@@ -136,8 +163,10 @@ That is not squeamishness about the API — it is that a second surface is a sec
 stale while the repository is fine, and an agent that had to hold a token and speak HTTP to say what
 it thinks would be harder to replace than one that only knows how to commit.
 
-`report.wiki: true` adds the repo's wiki, which is itself a git repository (`<origin>.wiki.git`) and
-so still only a push. It is opt-in for a mechanical reason: **GitHub does not create the wiki's git
+`report.wiki: true` renders the same hub into the repo's wiki — `Home.md`, a `_Sidebar.md`, and
+`Seat-<name>.md` per seat — which is itself a git repository (`<origin>.wiki.git`) and so still only
+a push. The wiki's advantage is that it sits in the repo's own navigation instead of behind a branch
+picker; its cost is one manual step. It is opt-in for a mechanical reason: **GitHub does not create the wiki's git
 repository until a first page exists**, so on a repo whose wiki was never opened there is no remote
 to push to. Open it once in the browser; after that it is only ever a push, and `publish.sh` says
 exactly this if you turn it on too early.

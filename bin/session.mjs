@@ -71,16 +71,40 @@ if (fs.existsSync(work)) {
   execFileSync('git', ['worktree', 'prune'], { stdio: 'ignore' });
 }
 
+// Release the branch from ANY worktree of this repository that still holds it, wherever that
+// is. `worktree add --force` overrides a busy PATH but not a busy BRANCH — git refuses to
+// force-update a ref another worktree has checked out, and no flag turns that off. So a
+// leftover from an interrupted run, or from the workspace location having moved, would retire
+// the seat permanently: it could never be checked out again without someone finding the
+// registration by hand.
+//
+// Only ever advocate workspaces are released here — a workspace is disposable and the branch
+// is the durable thing, and anything uncommitted in one is a session that already failed.
+for (const block of (gitQuiet('worktree', 'list', '--porcelain') || '').split('\n\n')) {
+  const at = block.match(/^worktree (.+)$/m);
+  const on = block.match(/^branch refs\/heads\/(.+)$/m);
+  if (!at || !on || on[1] !== seat.branch || at[1] === work) continue;
+  try { execFileSync('git', ['worktree', 'remove', '--force', at[1]], { stdio: 'ignore' }); }
+  catch { fs.rmSync(at[1], { recursive: true, force: true }); }
+}
+execFileSync('git', ['worktree', 'prune'], { stdio: 'ignore' });
+
 const exists = gitQuiet('rev-parse', '--verify', `refs/heads/${seat.branch}`)
   || gitQuiet('rev-parse', '--verify', `refs/remotes/origin/${seat.branch}`);
 
+// --force, because a workspace is DISPOSABLE and the branch is the durable thing. Without it,
+// a worktree registered at any other path still holding this branch — a leftover from an
+// interrupted run, or from before the workspace location changed — blocks the session
+// permanently, and the seat can never run again without someone finding and pruning it by
+// hand. Anything uncommitted in such a leftover is by definition a session that already
+// failed; the branch it was cut from is untouched, and that is what is being re-checked-out.
 if (exists) {
   const start = gitQuiet('rev-parse', '--verify', `refs/heads/${seat.branch}`)
     ? seat.branch : `origin/${seat.branch}`;
-  git('worktree', 'add', '--quiet', '-B', seat.branch, work, start);
+  git('worktree', 'add', '--quiet', '--force', '-B', seat.branch, work, start);
 } else {
   // First run: an orphan, so the workspace carries none of main's tree or history.
-  git('worktree', 'add', '--quiet', '--detach', work, head);
+  git('worktree', 'add', '--quiet', '--force', '--detach', work, head);
   execFileSync('git', ['-C', work, 'checkout', '--orphan', seat.branch], { stdio: 'ignore' });
   execFileSync('git', ['-C', work, 'rm', '-rq', '--cached', '.'], { stdio: 'ignore' });
   for (const e of fs.readdirSync(work)) if (e !== '.git') fs.rmSync(path.join(work, e), { recursive: true, force: true });

@@ -1,146 +1,95 @@
-A local round, and one page anyone can find
+A round is a budget, and three bugs that only appear once it runs
 
-Two things the framework described but did not ship: a runnable loop, and a place to read
-the result. Everything here is additive — no existing behaviour changes, `run.sh` and the
-workflow are untouched, and a repo that adopts none of it keeps working exactly as now.
+**#5 was merged mid-flight and these six commits landed after.** Nothing here is new work
+since — it is the second half of that branch, cut fresh from `main` so it is independently
+mergeable. It has been running locally against `constellation.anecdote.channel` and
+`cite-fort-collins` all afternoon; four seats have spoken.
 
-## What this is for
+Three of the four commits are bugs found by **running** it, and one is bad enough that I would
+not leave `main` sitting on it.
 
-I want to run the council **on my own machine, on a clock**, rather than on the pipeline —
-not because the pipeline is wrong, but because `hosted` is the metered API and I would
-rather spend the subscription I already have. That is the third path `LOCAL.md` has always
-described in prose ("a desktop routine, an agent on your laptop, or you") and never handed
-anybody as a command.
+## The three bugs
 
-## `bin/round.sh` — the routine prompt, made executable
+**A seat with no `ready` items killed the round.** `grep` exits 1 when it matches nothing, and
+zero `status: ready` is the *normal* case — `draft` is where things are supposed to sit. Under
+`set -o pipefail` that exit killed the script **between `git add -A` and the commit**, so a
+session that had genuinely been done was staged and then discarded.
 
-Fetch, run every seat through **the same `run.sh` that CI calls** (so the two paths cannot
-drift), hand each open work order to a local agent, commit, push, publish.
+Its shape is why it matters more than its size: **it is indistinguishable from the agent having
+done nothing.** The branch shows the previous quiet session, the work order is gone because the
+agent deleted it, and the seat reads as up to date having said nothing at all. I only caught it
+by holding the agent's own summary of what it had written next to a branch that did not contain
+it. It is in `run.sh` too, where it fires on the hosted path for exactly the same reason; fixed
+in both.
 
-```sh
-node .advocate-engine/bin/round.sh              # a whole round
-node .advocate-engine/bin/round.sh --dry-run    # what is owed; summon nothing
-node .advocate-engine/bin/round.sh --seat upkeep
-```
+**`worktree add --force` overrides a busy path, not a busy branch.** Git refuses to
+force-update a ref another worktree has checked out and no flag turns that off. So a single
+leftover worktree — from an interrupted run, or from the workspace location moving — **retires
+a seat permanently**: it can never be checked out again until a person finds the registration by
+hand. Every worktree of the repo holding the seat's branch is released first now.
 
-It refuses the way everything else here does: **if the agent does not delete the work order
-and leave a session note, the workspace is reverted and the seat still reads as owed.** A
-round that fired is not a round that spoke. The agent is swappable via
-`ADVOCATE_LOCAL_AGENT` — this must not become a Claude Code framework — and the bundled
-default is the `claude` CLI at `ADVOCATE_MODEL` (default `sonnet`, because a caretaking
-session is reading, and the cheap one is the one you can afford weekly).
+**A stale registration could do the same from the other side**, and `session.mjs` threw rather
+than continuing, which stranded every seat behind it in the loop. Prune unconditionally; a
+leftover is not a reason to abort a session.
 
-## The workspace had to move out of `.git`, and that is the interesting finding
+## A round is a budget, not a sweep
 
-The first real local session **died on its first write**, which is the best argument for
-having built this at all.
+The merged version runs every seat in every repo every time the clock fires. That is nine seats
+across four repositories here, and a session is **minutes of real attention** — an hour per
+round, which is exactly how a cadence stops being affordable and then stops being kept at all.
 
-`session.mjs` parks each seat's worktree at `.git/advocate-work/<seat>`, and the comment
-explains why: a workspace under the repo root gets swept into a stray `git add -A` and
-committed to `main`. That reason is sound. But Claude Code treats the entire `.git` directory
-as a sensitive path and refuses to write there — unattended, with nobody to approve it — so
-**the framework's headline story, "a local agent picks up the work order", could not be walked
-by the most likely local agent.** It had never been run, so nobody had found out.
+`--max` serves the **stalest** seats and the rest wait. **Waiting costs nothing**: a range is
+cumulative, so a seat served three rounds from now reads everything it would have read today.
+Seats carrying a standing work order go first, because they were already interrupted once.
 
-Outside the repo is the *stronger* version of the original guarantee: it cannot be committed
-to the subject by accident, because it is not in the subject. `session.mjs` honours
-`ADVOCATE_WORK_DIR` and is otherwise byte-identical in behaviour, so **CI is untouched** and
-keeps its `.git` default; `round.sh` sets it to `~/.local/state/advocate`.
+Selection is **read-only**, which is load-bearing rather than tidy: the mechanical half advances
+the pin, so preparing every seat in order to choose one would spend the range of every seat that
+did not get chosen.
 
-## `bin/digest.mjs` + `bin/publish.sh` — the reporting gap
+## The report is a hub, because an index only moved the problem
 
-A branch per seat is right for the work and **wrong for the reader**. Nobody checks out five
-branches to find out whether anything happened, which means the framework's actual output
-was, in practice, unread.
+The merged version writes one index page. In use that was half an answer — it tells you which
+seats exist and then sends you to a branch per seat to read a finding. **A hub you have to leave
+in order to learn anything is not a hub.**
 
-So a round ends by rewriting one page: every seat, when it last spoke, drafts still forming,
-what is asking to graduate, what is owed.
+So the report branch carries `README.md` **and a page per seat holding that seat's actual
+documents** — position, complaints, asks, last session note — copied whole from the branch, which
+stays the authority. `/tree/council` renders the index with everything one click away, **and
+nothing has to be turned on**. Pages for retired seats are deleted rather than left looking
+current.
 
-```yaml
-report:
-  branch: council      # default. `report: false` publishes nothing.
-  wiki: false
-```
-
-Three choices worth arguing with:
-
-- **Whole, never appended, no archive.** Reports get edited far more than they get written
-  and the value of the current one is that it is current. The history is in the branch,
-  which is where history goes. I did not want a tower of dated reports nobody reads.
-- **An orphan branch, not `main`.** A generated page in `main` churns the default branch
-  every round, and then every submodule pin pointing at that repo looks stale when nothing
-  changed. `/tree/council` renders `README.md`, so the branch *is* the page.
-- **Every destination is a push.** No issue, no discussion, no REST call. Not squeamishness:
-  a second surface is a second thing that can be stale while the repository is fine, and an
-  agent that needed a token and an HTTP client to say what it thinks is harder to replace
-  than one that only knows how to commit.
-
-`report.wiki: true` is opt-in for a **mechanical** reason I checked rather than assumed:
-GitHub does not create `<repo>.wiki.git` until a first page exists, so on a repo whose wiki
-was never opened there is no remote to push to at all (`git ls-remote` → *Repository not
-found*, even though `has_wiki` is true in the API). One click in a browser, once, and then it
-is only ever a push. `publish.sh` says exactly that if you turn it on too early.
-
-## `METHOD.md` — two things it did not say
-
-**How much to do in one session.** There was no answer, which invites the two bad ones:
-fixed quota, or as much as fits. The rule now is that the range sets the floor, the seat sets
-the ceiling and spends it on depth, and it tries to finish **one thing more** than last time —
-ripen a draft, close a complaint, measure a goal it reported as unmeasured. A session whose
-only product is one draft moving is a good session. Length is not effort.
-
-**A seat never proposes a seat.** Seating is an external gesture by the repository's owners.
-An advocate that could seat advocates would be a thing nobody appointed appointing things —
-and the softer version, quietly adopting a concern nobody gave it, is the same failure with
-better manners. Noticing a gap is still free and useful: one line in the session note, flagged
-as outside every seat. A raised hand, not a claim staked. Same line on remedies — say what the
-condition is and what it would take; do not strategise the migration. If the owners want the
-alternative, **that decision becomes a new advocacy, and it is theirs to make.**
-
-## A correction in `LOCAL.md`
-
-It said **"Nothing about the repository is sent to an inference provider"** — flatly, in bold —
-three paragraphs above a routine prompt that hands the work to an agent. Both cannot be true.
-
-Rewritten to the claim that *is* true and is worth more anyway: **the pipeline never calls
-out.** What drains the queue is the operator's choice, on their terms, under a subscription
-they already picked — rather than a metered call the framework made on its own initiative
-because a schedule fired. A person doing it by hand still sends nothing at all.
+The same pages render into a wiki with `--as wiki` (`Home`, `_Sidebar`, `Seat-<name>`) for anyone
+who has opened one; the difference is only how GitHub addresses them.
 
 ## Verified
 
-- `npm test` passes; `test/seats.test.mjs` gains the `report:` defaults and four refusals,
-  including the one that matters — **`report.branch` may not be a seat's workspace**, or the
-  round would write a generated page into a branch a seat is told it owns.
-- Ran against `constellation.anecdote.channel`: three seats prepared, orphan branches created
-  and pushed, work orders written, digest rendered, `--dry-run` reads and stops. That run is
-  what produced all three bug fixes above — **every one of them was found by running it, not
-  by reading it**, which is the argument for the whole branch.
-- `git ls-remote` on an unopened wiki genuinely fails (*Repository not found*) even with
-  `has_wiki: true`, which is why the wiki path is opt-in and says so.
+- `npm test` passes. The code here is byte-identical to what ran this afternoon.
+- Four real sessions, committed and pushed by the loop:
+  - **`consent`** reported all three of its goals `unmeasured` rather than estimating, and ruled
+    the range's merged PR out of scope on grounds its own config gives.
+  - **`presentation`** filed two `open` complaints against this node's stated goals: `BOUNDARY.md`
+    landed at the root with nothing on the visible side pointing at it, and `README.md` still says
+    *"Two, both `session: local`"* while `advocate.yml` has carried three seats since that range
+    merged.
+  - **`contributor`** (cite-fort-collins) found that `_intermediates/`, the artifact handed
+    wholesale to NCCV, holds a cited piece's full prose with no mechanism to prune it when a
+    citation is withdrawn — and corrected a prior "quiet session" commit that had wrongly claimed
+    nothing to report. That commit was the pipefail bug's own footprint.
+- Budget and rotation observed across three rounds: two seats served and one left waiting; the
+  next round rotated to the other repo and served exactly one.
+- Hubs live at
+  [`constellation/tree/council`](https://github.com/FCCN-ANTIBODY/constellation.anecdote.channel/tree/council)
+  and `cite-fort-collins/tree/council`.
 
-## Two things I noticed and did not act on
+## Still true from #5, and still not acted on
 
-Neither is mine to decide.
-
-- **`run.sh` advances the pin at prepare time.** If the judgement half never happens, the pin
-  has still moved, and the range a seat was supposed to read is only recoverable from the JSON
-  block inside `sessions/PENDING.md`. That is presumably deliberate — the order *is* the
-  record — but it means losing the order loses the range, silently.
-- **The `advocate/` branch namespace now has two kinds of thing in it.**
-  `constellation.anecdote.channel` merged a feature branch called `advocate/seat-addressing`,
-  which reads as the workspace of a seat named `seat-addressing`; alongside it now sits
-  `advocate/addressing`, the actual workspace. Nothing breaks, but `bin/pending.mjs` and
-  `bin/digest.mjs` both find seats by branch name, and the namespace is load-bearing for the
-  guest story.
-
-## Left undone, deliberately
-
-- **No test for `round.sh` or `publish.sh`.** They are shell over git and an agent; testing
-  them honestly means a scratch repo and a fake agent. Worth doing, not done here.
-- `order.mjs` derives the method path from `basename(engine-dir)`, so running the engine from
-  a checkout that is not named `.advocate-engine` writes a work order pointing at a path the
-  next reader does not have. Harmless when mounted normally; noted, not fixed.
-- Nothing here schedules anything. The plist is on my machine, not in the repo.
+- **`run.sh` advances the pin at prepare time.** If the judgement half never happens, the range is
+  recoverable only from the JSON inside `sessions/PENDING.md`. Losing the order loses the range,
+  silently. Presumably deliberate; worth saying out loud.
+- **The `advocate/` namespace holds two kinds of thing.** `advocate/seat-addressing` was a feature
+  branch and is now merged; `advocate/addressing` is the seat's workspace. Nothing breaks, but both
+  `pending.mjs` and `digest.mjs` find seats by branch name.
+- **No test for `round.sh` or `publish.sh`.** Shell over git and an agent; testing them honestly
+  needs a scratch repo and a fake agent. Worth doing, not done here.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

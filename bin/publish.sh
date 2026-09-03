@@ -30,9 +30,6 @@ wiki=$(node -e 'const r=JSON.parse(process.argv[1]);process.stdout.write(String(
 
 if [ -z "$branch" ] && [ "$wiki" != "true" ]; then say "report: nothing declared; digest not published"; exit 0; fi
 
-page="$(mktemp)"; trap 'rm -f "$page"' EXIT
-node "$here/bin/digest.mjs" > "$page"
-
 # --- the branch ---------------------------------------------------------------------------
 if [ -n "$branch" ]; then
   # Same reasoning as a seat's workspace (see session.mjs): out of the subject repo where
@@ -61,7 +58,10 @@ if [ -n "$branch" ]; then
     find "$work" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
   fi
 
-  cp "$page" "$work/README.md"
+  # The whole hub, not just the index. /tree/<branch> renders README.md and lists the seat
+  # pages beside it, so the findings are one click from the repo with nothing turned on —
+  # which is the thing the wiki was wanted for, minus the wiki's one-time manual setup.
+  node "$here/bin/digest.mjs" --pages "$work" --as branch
   git -C "$work" config user.name  "${ADVOCATE_COMMITTER_NAME:-advocate}"
   git -C "$work" config user.email "${ADVOCATE_COMMITTER_EMAIL:-advocate@users.noreply.github.com}"
   git -C "$work" add -A
@@ -93,7 +93,10 @@ if [ "$wiki" = "true" ]; then
   else
     ww="$(mktemp -d)"
     git clone -q "$url" "$ww"
-    cp "$page" "$ww/Home.md"
+    # The whole hub, not just the index: Home, a sidebar, and one page per seat carrying that
+    # seat's actual documents. An index of links would only relocate the problem — you would
+    # still open a branch per seat to read a finding.
+    node "$here/bin/digest.mjs" --pages "$ww" --as wiki
     git -C "$ww" config user.name  "${ADVOCATE_COMMITTER_NAME:-advocate}"
     git -C "$ww" config user.email "${ADVOCATE_COMMITTER_EMAIL:-advocate@users.noreply.github.com}"
     git -C "$ww" add -A
