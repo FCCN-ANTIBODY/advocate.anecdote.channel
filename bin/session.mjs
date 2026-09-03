@@ -33,9 +33,22 @@ const seat = cfg.advocates.find((a) => a.name === name);
 if (!seat) { console.error(`advocate: no advocate named ${JSON.stringify(name)} in ${cfg.file}`); process.exit(1); }
 
 const root = git('rev-parse', '--show-toplevel');
-// Inside .git on purpose: a workspace under the worktree root gets swept into a stray
+// Inside .git by default: a workspace under the worktree root gets swept into a stray
 // `git add -A` on the subject and committed to main, which is the one place it must never be.
-const work = path.join(git('rev-parse', '--git-common-dir').replace(/^(?!\/)/, root + '/'), 'advocate-work', seat.name);
+//
+// ADVOCATE_WORK_DIR puts it somewhere else, and the local path needs it. An agent running on
+// somebody's own machine may be forbidden to write under `.git` at all — Claude Code treats
+// the whole directory as sensitive and refuses, with no way to approve it unattended — so
+// the framework's headline story, "a local agent picks up the work order", could not be
+// walked by the most likely local agent. A workspace the agent may not write in is not a
+// workspace.
+//
+// A path OUTSIDE the subject repo satisfies the original constraint more strongly than `.git`
+// ever did: it cannot be swept into a commit on the subject, because it is not in the subject.
+const gitDir = git('rev-parse', '--git-common-dir').replace(/^(?!\/)/, root + '/');
+const work = process.env.ADVOCATE_WORK_DIR
+  ? path.resolve(process.env.ADVOCATE_WORK_DIR, path.basename(root), seat.name)
+  : path.join(gitDir, 'advocate-work', seat.name);
 const head = git('rev-parse', subjectRef);
 const today = new Date().toISOString().slice(0, 10);
 

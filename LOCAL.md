@@ -74,6 +74,16 @@ fired is not a round that spoke.
 | `ADVOCATE_LOCAL_AGENT` | a command taking `<workspace> <root> <seat>` with the prompt on stdin. Default: the `claude` CLI. |
 | `ADVOCATE_MODEL` | model for the default agent. Default `sonnet` — a caretaking session is reading, not reasoning about a hard problem, and the cheap one is the one you can afford weekly. |
 | `ADVOCATE_PUSH` | `false` leaves every branch local. |
+| `ADVOCATE_WORK_DIR` | where workspaces are checked out. `round.sh` defaults it to `~/.local/state/advocate`. |
+
+**Why the workspaces move on this path.** `session.mjs` puts them under `.git/` so a stray
+`git add -A` on the subject cannot sweep one into `main`. That is right for CI and unusable
+locally: an agent running on somebody's machine may be flatly forbidden to write anywhere under
+`.git` — Claude Code treats the whole directory as sensitive and refuses, with nobody around to
+approve it — so the local path would fail on its first write, every time. A workspace the agent
+cannot write in is not a workspace. Outside the repo is the **stronger** version of the same
+guarantee anyway: it cannot be committed to the subject by accident, because it is not in the
+subject.
 
 ### The cadence is the budget
 

@@ -34,6 +34,17 @@ done
 
 say() { echo "round[$(basename "$root")]: $*"; }
 
+# The workspaces go OUTSIDE the subject repo on this path, and this is load-bearing rather
+# than tidy. `session.mjs` defaults them under `.git/`, which keeps a stray `git add -A` from
+# sweeping them into main — correct for CI, and unusable here: an agent on somebody's own
+# machine may be flatly forbidden to write under `.git`, with nobody around to approve it.
+# A workspace the agent cannot write in is not a workspace.
+#
+# Outside the repo is the stronger version of the same guarantee. It cannot be committed to
+# the subject by accident because it is not in the subject.
+export ADVOCATE_WORK_DIR="${ADVOCATE_WORK_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/advocate}"
+mkdir -p "$ADVOCATE_WORK_DIR"
+
 # The range is the input, and a stale checkout hides it. Failing to fetch is not fatal —
 # offline is a supported condition here, and a round read from local refs is still honest
 # about what it read.

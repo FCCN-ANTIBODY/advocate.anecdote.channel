@@ -35,8 +35,15 @@ node "$here/bin/digest.mjs" > "$page"
 
 # --- the branch ---------------------------------------------------------------------------
 if [ -n "$branch" ]; then
-  work="$(git -C "$root" rev-parse --git-common-dir)/advocate-report"
-  case "$work" in /*) ;; *) work="$root/$work" ;; esac
+  # Same reasoning as a seat's workspace (see session.mjs): out of the subject repo where
+  # `git add -A` cannot reach it, and out of `.git` where a local agent may not write.
+  if [ -n "${ADVOCATE_WORK_DIR:-}" ]; then
+    work="$ADVOCATE_WORK_DIR/$(basename "$root")/.report"
+  else
+    work="$(git -C "$root" rev-parse --git-common-dir)/advocate-report"
+    case "$work" in /*) ;; *) work="$root/$work" ;; esac
+  fi
+  mkdir -p "$(dirname "$work")"
   rm -rf "$work"
   git -C "$root" worktree prune
 
