@@ -29,6 +29,20 @@ concurrency:
   group: council-${{ github.ref }}
   cancel-in-progress: false
 
+# WHICH PROVIDER a hosted seat calls is `backend:` in advocate.yml, not anything in here —
+# declared in the repository, reviewed in a pull request, and not decided by which secret
+# happens to exist at the org. See BACKEND.md.
+#
+# A LOCAL BACKEND NEEDS NO SECRET AND NO EGRESS. On a self-hosted runner with
+# `backend: {kind: openai, url: http://127.0.0.1:11434/..., key-env: ""}` this workflow holds
+# no credential at all — and a job holding no secret cannot leak one. Swap `runs-on` for
+# `[self-hosted, advocate]` and delete the `agent-key` line; nothing else changes.
+#
+# THE MATRIX IS A BUDGET PROBLEM. This fans out over EVERY seat, so a five-seat repo makes five
+# calls every time the schedule fires, forever. That is the lesson the local runner already
+# learned — a round is a budget, not a sweep. Until the matrix step can emit a capped, stalest-
+# first list, keep the cadence long and the councils small.
+
 jobs:
   seats:
     runs-on: ubuntu-latest
@@ -57,8 +71,9 @@ jobs:
         uses: ./.advocate-engine
         with:
           advocate: ${{ matrix.name }}
-          # An FCCN-ANTIBODY org secret; ANTHROPIC_API_KEY is the fallback name judgement
-          # uses. Blank => the session stages for a human and is never faked.
+          # A ROLE, not a vendor: "the credential that summons a session". What it opens is
+          # `backend:` in advocate.yml. Blank => the session stages for a human, never faked —
+          # and a local backend wants it blank.
           agent-key: ${{ secrets.ADVOCATE_AGENT_KEY || secrets.ANTHROPIC_API_KEY }}
           # The Anthropic workspace id (`wrkspc_01...`, from the Anthropic Console) — not a
           # GitHub org or repo name. Only needed when the key is identity-linked. Not a

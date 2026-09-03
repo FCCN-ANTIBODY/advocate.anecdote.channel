@@ -50,6 +50,44 @@ function resolveReport(r, where) {
   return { branch: branch === false ? null : branch, wiki: r.wiki === true };
 }
 
+// `backend:` — WHAT a session calls, when `session: hosted` says it may call anything.
+//
+// Same rule as `session:`, one level down: a credential appearing must never decide behaviour.
+// An org secret named for a ROLE ("the key that summons a session") was silently choosing a
+// VENDOR, because the bundled adapter is the only one there was. See BACKEND.md.
+//
+// Repo-level with a per-seat override, and absent means exactly today's behaviour.
+const KINDS = ['anthropic', 'openai', 'command'];
+
+function resolveBackend(b, where, what) {
+  if (b === undefined || b === null) return null;
+  if (typeof b === 'string') b = { kind: b };
+  if (typeof b !== 'object' || Array.isArray(b)) die(`${where}: ${what} must be a mapping, or a kind`);
+  const kind = b.kind ?? 'anthropic';
+  if (!KINDS.includes(kind)) die(`${where}: ${what}.kind must be one of ${KINDS.join(', ')} (got ${JSON.stringify(kind)})`);
+  // A declaration that names no command is not a command backend; it is a typo that would fall
+  // through to the default adapter and look like it worked.
+  if (kind === 'command' && (typeof b.command !== 'string' || !b.command.trim())) {
+    die(`${where}: ${what}.kind is 'command' but no command: is given`);
+  }
+  if (kind !== 'command' && b.command !== undefined) {
+    die(`${where}: ${what}.command only applies to kind: command`);
+  }
+  for (const k of ['model', 'url', 'command']) {
+    if (b[k] !== undefined && typeof b[k] !== 'string') die(`${where}: ${what}.${k} must be a string`);
+  }
+  // "" is meaningful and not the same as absent: it says this backend takes NO credential, which
+  // is the strongest configuration available and must not be read as "you forgot to set it".
+  if (b['key-env'] !== undefined && typeof b['key-env'] !== 'string') die(`${where}: ${what}.key-env must be a string`);
+  return {
+    kind,
+    model: b.model ?? null,
+    url: b.url ?? null,
+    command: b.command ?? null,
+    'key-env': b['key-env'] === undefined ? 'ADVOCATE_AGENT_KEY' : b['key-env'],
+  };
+}
+
 export function loadConfig(root = process.cwd()) {
   const found = process.env.ADVOCATE_CONFIG
     ? path.resolve(process.env.ADVOCATE_CONFIG)
@@ -68,6 +106,8 @@ export function loadConfig(root = process.cwd()) {
   // nothing else — no API to keep honest, no second surface that can be stale while the
   // repository is fine. `report: false` publishes nothing, which is a complete answer.
   cfg.report = resolveReport(cfg.report, found);
+  const repoBackend = resolveBackend(cfg.backend, found, 'backend');
+  cfg.backend = repoBackend;
 
   const seen = new Set();
   cfg.advocates = cfg.advocates.map((a, i) => {
@@ -104,6 +144,9 @@ export function loadConfig(root = process.cwd()) {
       session,
       writes,
       constitution: a.constitution ?? cfg.constitution ?? null,
+      // One seat on a big model and another on a cheap local one is a reasonable thing to
+      // want, and this is where you would look for it.
+      backend: resolveBackend(a.backend, `${found}: advocates[${i}]`, `${a.name}.backend`) ?? repoBackend,
       goals: Array.isArray(a.goals) ? a.goals : [],
       'out-of-scope': Array.isArray(a['out-of-scope']) ? a['out-of-scope'] : [],
     };
@@ -122,6 +165,10 @@ if (isMain(import.meta.url)) {
   const args = process.argv.slice(2);
   if (args[0] === '--matrix') {
     console.log(JSON.stringify({ include: cfg.advocates.map(({ name, branch, cadence, session }) => ({ name, branch, cadence, session })) }));
+  } else if (args[0] === '--backend') {
+    const seat = args[1] ? cfg.advocates.find((a) => a.name === args[1]) : null;
+    if (args[1] && !seat) die(`no advocate named ${JSON.stringify(args[1])}`);
+    console.log(JSON.stringify((seat ? seat.backend : cfg.backend) || { kind: 'anthropic', model: null, url: null, command: null, 'key-env': 'ADVOCATE_AGENT_KEY' }));
   } else if (args[0] === '--report') {
     console.log(JSON.stringify(cfg.report));
   } else if (args[0] === '--seat') {

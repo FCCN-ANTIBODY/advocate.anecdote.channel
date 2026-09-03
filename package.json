@@ -3,5 +3,7 @@
   "private": true,
   "type": "module",
   "description": "Agentic repository caretaking framework. No dependencies, on purpose.",
-  "scripts": { "test": "node test/yaml-enough.test.mjs && node test/seats.test.mjs" }
+  "scripts": {
+    "test": "node test/yaml-enough.test.mjs && node test/seats.test.mjs && node test/adapter.test.mjs"
+  }
 }
