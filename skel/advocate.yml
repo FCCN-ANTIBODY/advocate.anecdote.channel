@@ -14,6 +14,13 @@ report:
   branch: council     # an orphan branch of this repo, rewritten whole each round
   wiki: false         # also the repo's wiki — opt-in; it needs one page to exist first
 
+# Optional. What a hosted session calls. Absent = the Anthropic Messages API, as before.
+# A local model is a url, not a fork — see BACKEND.md.
+# backend:
+#   kind: openai
+#   url: http://127.0.0.1:11434/v1/chat/completions
+#   key-env: ""           # this backend takes no credential
+
 # Optional. Where this repo binds its caretakers, if it does. Absent is normal — there is no
 # master constitution for caretakers, and a mission below is a complete standard on its own.
 # constitution: CONSTITUTION.md
