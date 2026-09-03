@@ -34,18 +34,71 @@ node .advocate-engine/bin/session.mjs upkeep # prepare (or re-enter) one workspa
 
 ## What this actually buys you
 
-**Nothing about the repository is sent to an inference provider.** Not the diff, not the
-constitution, not the advocate's reasoning. The strongest version of not-being-trained-on is not
-choosing a vendor with a good policy this quarter — it is never sending it.
+**The pipeline never calls out.** Nothing in a `local` session — not the diff, not the
+constitution, not the advocate's reasoning — is sent anywhere by this framework. The strongest
+version of not-being-trained-on is not choosing a vendor with a good policy this quarter; it is the
+code that would do the sending not existing on this path.
 
-**The honest limit:** pushing the branch still puts the *result* on GitHub, and on a public repo
-that was always public. What stays home is the reading and the reasoning, which is the part that
-was never public and never had to leave.
+**Two honest limits, because the sentence above is easy to over-read.**
+
+1. **`local` is a claim about the pipeline, not about you.** The work order is a queue anything can
+   drain, and the routine prompt below hands it to an agent on purpose. If that agent is a hosted
+   model, the repository reaches an inference provider — through *your* client, on *your* terms,
+   under a subscription you already chose, rather than through a metered call this framework made
+   on its own initiative because a schedule fired. That distinction is the entire point of the
+   declaration, and it is worth more than the absolute would have been. A person doing it by hand,
+   or a model on the same machine, sends nothing at all.
+2. **Pushing the branch still puts the *result* on GitHub**, and on a public repo that was always
+   public. What stays home is the reading, which is the part that was never public.
+
+## One command: `bin/round.sh`
+
+The prompt below is the loop written out for a person. `bin/round.sh` is the same loop written out
+for a machine, and it is what a schedule should point at:
+
+```sh
+node .advocate-engine/bin/round.sh              # fetch, run every seat, publish the digest
+node .advocate-engine/bin/round.sh --dry-run    # what is owed, without summoning anything
+node .advocate-engine/bin/round.sh --seat upkeep
+```
+
+It runs the mechanical half through the same `run.sh` that CI calls — so the two paths cannot
+drift — then hands each open work order to a local agent, commits, pushes, and rewrites the digest.
+
+**It refuses the way everything else here does.** If the agent does not delete the work order and
+leave a session note, the workspace is reverted and the seat still reads as owed. A round that
+fired is not a round that spoke.
+
+| | |
+| --- | --- |
+| `ADVOCATE_LOCAL_AGENT` | a command taking `<workspace> <root> <seat>` with the prompt on stdin. Default: the `claude` CLI. |
+| `ADVOCATE_MODEL` | model for the default agent. Default `sonnet` — a caretaking session is reading, not reasoning about a hard problem, and the cheap one is the one you can afford weekly. |
+| `ADVOCATE_PUSH` | `false` leaves every branch local. |
+| `ADVOCATE_WORK_DIR` | where workspaces are checked out. `round.sh` defaults it to `~/.local/state/advocate`. |
+
+**Why the workspaces move on this path.** `session.mjs` puts them under `.git/` so a stray
+`git add -A` on the subject cannot sweep one into `main`. That is right for CI and unusable
+locally: an agent running on somebody's machine may be flatly forbidden to write anywhere under
+`.git` — Claude Code treats the whole directory as sensitive and refuses, with nobody around to
+approve it — so the local path would fail on its first write, every time. A workspace the agent
+cannot write in is not a workspace. Outside the repo is the **stronger** version of the same
+guarantee anyway: it cannot be committed to the subject by accident, because it is not in the
+subject.
+
+### The cadence is the budget
+
+Pick the interval from **what the work costs you**, not from what would be responsive. Seats read
+merged commits; nothing arrives between them that a faster clock would catch sooner. Weekly is the
+shipped default, and a round that fires against an empty range costs one line and a few seconds.
+
+If the agent runs against a subscription with a usage window, **align the interval to the window
+rather than to the calendar** — one round per window is a rate nothing else has to be tuned around,
+and it makes the worst case a round you can name in advance.
 
 ## The routine prompt
 
-For a scheduled local agent (Claude desktop routines, cron, whatever). It is short on purpose —
-everything it needs is in the checkout by the time it looks.
+If you would rather drive it yourself. It is short on purpose — everything it needs is in the
+checkout by the time it looks.
 
 ```
 Weekly, in <path-to-repo>:

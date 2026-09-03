@@ -105,6 +105,43 @@ advocate/upkeep
 allowed to be as big and as strange as it needs — a growing tree with reasons of its own, which is
 the thing a tidy folder in `main` would keep punishing.
 
+## One page you can actually find
+
+A branch per seat is right for the work and wrong for the reader: nobody checks out five branches
+to find out whether anything happened. So a round ends by rewriting **one page** — every seat, when
+it last spoke, what is still forming, and what is asking to graduate.
+
+```sh
+node .advocate-engine/bin/digest.mjs            # to stdout
+node .advocate-engine/bin/publish.sh            # to wherever report: says
+```
+
+```yaml
+report:
+  branch: council      # the default. `report: false` publishes nothing.
+  wiki: false          # opt-in; see below
+```
+
+**The default destination is another branch**, holding one `README.md` so that visiting
+`/tree/council` renders it. It is orphaned and never merged, for the same reason a seat's branch is:
+a generated page in `main` churns the default branch every round, and every submodule pin pointing
+at that repo then looks stale when nothing changed.
+
+**It is rewritten whole, every time, and there is no archive.** Reports get edited far more than
+they get written; the value of the current one is that it is current. The history is in the branch,
+which is where history goes.
+
+**Every destination is a push.** No issue is opened, no discussion is filed, no REST call is made.
+That is not squeamishness about the API — it is that a second surface is a second thing that can be
+stale while the repository is fine, and an agent that had to hold a token and speak HTTP to say what
+it thinks would be harder to replace than one that only knows how to commit.
+
+`report.wiki: true` adds the repo's wiki, which is itself a git repository (`<origin>.wiki.git`) and
+so still only a push. It is opt-in for a mechanical reason: **GitHub does not create the wiki's git
+repository until a first page exists**, so on a repo whose wiki was never opened there is no remote
+to push to. Open it once in the browser; after that it is only ever a push, and `publish.sh` says
+exactly this if you turn it on too early.
+
 ## Anyone can advocate for you, and it costs you nothing
 
 Fork this repository's *subject*, run the same framework, and hand back your branch. **The fork is

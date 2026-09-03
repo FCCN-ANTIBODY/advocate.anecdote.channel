@@ -14,6 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { loadConfig } from './seats.mjs';
 
 const git = (...a) => execFileSync('git', a, { encoding: 'utf8' }).trimEnd();
@@ -33,15 +34,42 @@ const seat = cfg.advocates.find((a) => a.name === name);
 if (!seat) { console.error(`advocate: no advocate named ${JSON.stringify(name)} in ${cfg.file}`); process.exit(1); }
 
 const root = git('rev-parse', '--show-toplevel');
-// Inside .git on purpose: a workspace under the worktree root gets swept into a stray
+// Inside .git by default: a workspace under the worktree root gets swept into a stray
 // `git add -A` on the subject and committed to main, which is the one place it must never be.
-const work = path.join(git('rev-parse', '--git-common-dir').replace(/^(?!\/)/, root + '/'), 'advocate-work', seat.name);
+//
+// ADVOCATE_WORK_DIR puts it somewhere else, and the local path needs it. An agent running on
+// somebody's own machine may be forbidden to write under `.git` at all — Claude Code treats
+// the whole directory as sensitive and refuses, with no way to approve it unattended — so
+// the framework's headline story, "a local agent picks up the work order", could not be
+// walked by the most likely local agent. A workspace the agent may not write in is not a
+// workspace.
+//
+// A path OUTSIDE the subject repo satisfies the original constraint more strongly than `.git`
+// ever did: it cannot be swept into a commit on the subject, because it is not in the subject.
+// Keyed by the CHECKOUT, not by the repository's name. Two clones of the same repo on one
+// machine — a worktree, a scratch copy, the same project cloned twice — would otherwise share
+// a workspace path, and the second one to run would try to remove a worktree registered to the
+// first. That is a data-loss shape, not an inconvenience.
+const gitDir = git('rev-parse', '--git-common-dir').replace(/^(?!\/)/, root + '/');
+const work = process.env.ADVOCATE_WORK_DIR
+  ? path.resolve(process.env.ADVOCATE_WORK_DIR,
+      `${path.basename(root)}-${createHash('sha1').update(root).digest('hex').slice(0, 7)}`,
+      seat.name)
+  : path.join(gitDir, 'advocate-work', seat.name);
 const head = git('rev-parse', subjectRef);
 const today = new Date().toISOString().slice(0, 10);
 
 // --- the workspace, as a worktree on the advocate's own branch --------------------------
 fs.mkdirSync(path.dirname(work), { recursive: true });
-if (fs.existsSync(work)) execFileSync('git', ['worktree', 'remove', '--force', work], { stdio: 'ignore' });
+// Tolerant on purpose. `worktree remove` fails when the path is registered to a DIFFERENT
+// repository, or to no repository at all — a leftover from a run that was interrupted, or
+// from a sibling checkout. Neither is a reason to abort a session: clear the path, prune the
+// stale registration, and carry on. Crashing here strands every seat behind it.
+if (fs.existsSync(work)) {
+  try { execFileSync('git', ['worktree', 'remove', '--force', work], { stdio: 'ignore' }); }
+  catch { fs.rmSync(work, { recursive: true, force: true }); }
+  execFileSync('git', ['worktree', 'prune'], { stdio: 'ignore' });
+}
 
 const exists = gitQuiet('rev-parse', '--verify', `refs/heads/${seat.branch}`)
   || gitQuiet('rev-parse', '--verify', `refs/remotes/origin/${seat.branch}`);
