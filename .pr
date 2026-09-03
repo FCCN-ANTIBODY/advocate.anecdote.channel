@@ -140,18 +140,35 @@ because a schedule fired. A person doing it by hand still sends nothing at all.
   session: it reported all three of its goals `unmeasured` rather than estimating, and ruled
   the range's one merged PR out of its own scope on the grounds its own config gives. That is
   the method working, including its refusals.
-- **Five bugs, every one found by running it rather than reading it.** The local path had
+- The `presentation` seat then read the range and filed two `open` complaints against the
+  subject's own goals — a root file nothing on the visible side points at, and a README that
+  says "two seats" when `advocate.yml` has carried three since that range merged.
+- The hub is live at
+  [`/tree/council`](https://github.com/FCCN-ANTIBODY/constellation.anecdote.channel/tree/council):
+  index plus a page per seat, findings readable without opening a branch.
+- **Six bugs, every one found by running it rather than reading it.** The local path had
   never been walked. That is the argument for the whole branch.
 - `git ls-remote` on an unopened wiki genuinely fails (*Repository not found*) even with
   `has_wiki: true`, which is why the wiki path is opt-in and says so.
 
-## The fifth bug: `--force` is not enough
+## The two worst-shaped bugs
 
-`worktree add --force` overrides a busy **path** but not a busy **branch** — git refuses to
-force-update a ref another worktree has checked out, and no flag turns that off. So a single
-leftover worktree retires a seat permanently; it can never be checked out again until a person
-finds the registration by hand. Every worktree of the repo holding the seat's branch is now
-released first.
+**`--force` is not enough.** `worktree add --force` overrides a busy **path** but not a busy
+**branch** — git refuses to force-update a ref another worktree has checked out, and no flag
+turns that off. So a single leftover worktree retires a seat permanently; it can never be
+checked out again until a person finds the registration by hand. Every worktree of the repo
+holding the seat's branch is now released first.
+
+**A seat with no `ready` items killed the round.** `grep` exits 1 when it matches nothing, and
+zero `status: ready` is the *normal* case — `draft` is where things are supposed to sit. Under
+`set -o pipefail` that exit killed the script **between `git add -A` and the commit**, so a
+session that had genuinely been done was staged and then discarded.
+
+Its shape is why it matters more than its size: **it is indistinguishable from the agent having
+done nothing.** The branch shows the previous quiet session, the work order is gone because the
+agent deleted it, and the seat reads as up to date having said nothing at all. I only caught it
+because I had the agent's own summary of what it had written next to a branch that did not have
+it. Present in `run.sh` too, where it fires on the hosted path for the same reason; fixed in both.
 
 ## Two things I noticed and did not act on
 
