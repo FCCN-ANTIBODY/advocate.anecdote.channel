@@ -32,7 +32,32 @@ how it *works* — a declarative definition of the loop, not the runtime it depe
 
 ## Mounting it
 
-Two files land in the repository being cared for, and one of them is optional.
+A mount and two files land in the repository being cared for, and one of the files is optional.
+
+**0. The mount: `.advocate-engine`** — this repository, as a submodule, per the
+`.<subdomain>-engine` convention.
+
+```sh
+git submodule add https://github.com/FCCN-ANTIBODY/advocate.anecdote.channel .advocate-engine
+```
+
+The local runbook is written against it — `node .advocate-engine/bin/pending.mjs`,
+`node .advocate-engine/bin/session.mjs <advocate>` — so without the mount the default path has
+nothing to run. See [`LOCAL.md`](LOCAL.md).
+
+**Why a mount and not a vendored copy.** Two reasons, and the second is the deciding one.
+
+*The pin is a broadcast.* A submodule records a hash in the subject repository, so which version of
+this a repo took, and when it took it, is legible from the outside without asking anyone. That
+presence is itself a signal about how the repo is governed — visible before a single session runs.
+A vendored file would carry a hash too, so this reason alone would not settle it.
+
+*This is a space, not a payload.* It is an engine: material a subject repo is meant to be able to
+bootstrap from, not a fixed set of files to copy once. A vendored copy forecloses that — it freezes
+the thing at the moment it was taken and turns every later capability into a re-vendoring chore.
+Mounting keeps the engine canonical and lets a subject reach into it for whatever it grows.
+
+The cost is real and small: a recursive clone of a subject repository pulls this one too.
 
 **1. `advocate.yml` at the root** — the only file this framework asks you for. Start from
 [`skel/advocate.yml`](skel/advocate.yml); the annotated version is
