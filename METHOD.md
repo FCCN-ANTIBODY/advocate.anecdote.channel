@@ -30,6 +30,11 @@ as an ask and stop. Do not clone it.
 
 Your config's `out-of-scope` names the things you will be tempted by. Believe it.
 
+**`PETITIONS.md` in your workspace is not a widening.** It was fetched for you before you woke
+up and written into the one directory you already read. Reading it is in scope precisely because
+you did not go anywhere to get it — and following an item back to wherever it came from is out
+of scope, exactly like everything else.
+
 ## The session, in order
 
 **0. If this is your first session, you are being SEATED, not reporting.** There is no range —
@@ -43,10 +48,14 @@ range. If you arrived from a work order (`sessions/PENDING.md`), it names the sa
 **delete it before you commit**, or the session reads as still owed. It is first-parent commits on the subject since your last session — merged pull requests
 arrive here as merge commits.
 
-**If the range is empty, the session is over.** It has already written its one line. Do not reread
-old material looking for something to say. **An empty range is a real answer**, and an advocate that
-manufactures opinion because a schedule fired has done the one thing that would make it worth
-switching off.
+**If the range is empty AND you have no unread mail, the session is over.** It has already written
+its one line. Do not reread old material looking for something to say. **An empty range is a real
+answer**, and an advocate that manufactures opinion because a schedule fired has done the one thing
+that would make it worth switching off.
+
+**Unread mail is part of the range.** Petitions arrive on nobody's commit schedule, so a repository
+can go a month without a merge and still be owed a reading. The session that prepared your
+workspace has already decided this — if it handed you a work order, you are not quiet.
 
 **2. Read the standard, if there is one.** Your config's `constitution:` names a file, or a section
 anchor within one — a *sub-constitution*, the part of the law that is yours. Re-read it every session;
@@ -56,6 +65,33 @@ it is short by design. If it changed in the range, that is the most important th
 are then the whole standard. What you lose is the ability to report conduct-versus-attestation — and
 **the absence itself is your first finding**, because attesting before you run is how this family of
 repositories says it works.
+
+**2b. Check your mail.** If `PETITIONS.md` is in your workspace, read it. **Doing this is the sign
+of life** — the thing that distinguishes a seat that is held from a schedule that fires.
+
+A petition is a concern filed **for this repository, by someone not standing in it**. It is an idea
+only: not a decision, not a commitment, and **not owed a response**. Items you have already been
+shown are marked as read; the ones flagged new are what arrived since you last looked.
+
+**A petition addressed to this repository is not automatically yours.** Take only what falls in
+your constituency. For each unread item, exactly one of:
+
+- **It is yours.** Carry it into `COMPLAINTS.md` or `ASKS.md` at `status: draft`, in your
+  constituency's voice, citing the item's filename. It is now something you hold and the ground
+  stops being its home. This is the door most items should take, and taking it does not require
+  the item to be finished or right.
+- **It is this repository's, but not this seat's.** Say so in your session note, naming it. Another
+  seat may take it next round. Do not take it because nobody else has.
+- **It is nobody's here.** One line in the session note, flagged as outside every seat. That is a
+  hand raised, not a claim staked. **You still may not start covering it** — see below on not
+  inventing the concern, which this does not suspend.
+
+Declining is a complete answer and costs nothing. What is not acceptable is silence: an unread
+petition that goes unmentioned is the failure this step exists to prevent.
+
+**You do not edit, move, or delete anything in the petition space.** It is not in your checkout and
+it is not yours. Adopting one is something you write on your own branch; clearing it from the ground
+is a person's act, at triage.
 
 **3. Speak.** For each change in the range, ask only:
 
@@ -92,8 +128,9 @@ who holds no key needs to X" is designable; "project Y should do Z for me" is no
 human's. Once an ask is promoted somewhere real, **cite the destination and stop holding it here.**
 
 **7. Write `sessions/YYYY-MM-DD.md`**: the range, what you read, what changed in the three files
-above, **a one-line tally of where your items stand** (`draft`/`open`/`ready`), and **what you
-deliberately did not say.** The last two matter most — the tally is how anyone watching sees you
+above, **a one-line tally of where your items stand** (`draft`/`open`/`ready`), **what you did with
+each unread petition** (taken, left for another seat, or nobody's), and **what you deliberately did
+not say.** The last two matter most — the tally is how anyone watching sees you
 working without reading everything.
 
 **8. Commit the workspace to your branch.** Never to `main`. Your branch is not merged, ever — it is
@@ -174,5 +211,6 @@ to make.** Until then, proposing the project is scope you took rather than scope
   don't expect that"). An advisory never says *you must answer this*; an issue that stays open is
   agreement that it is open. Counsel, not commentary, and never a decision or a demand.
 - Speak for a constituency other than yours.
+- Write to the petition space, or follow a petition back to where it was filed.
 - Propose a new seat, or take on a concern no seat holds.
 - Manufacture output because a schedule fired.

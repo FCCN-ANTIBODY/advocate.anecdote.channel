@@ -16,6 +16,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { loadConfig } from './seats.mjs';
+import { inbound, unseen, render } from './petitions.mjs';
 
 const git = (...a) => execFileSync('git', a, { encoding: 'utf8' }).trimEnd();
 const gitQuiet = (...a) => { try { return execFileSync('git', a, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trimEnd(); } catch { return null; } };
@@ -122,20 +123,43 @@ const range = since ? `${since}..${head}` : head;
 const first = since === null;
 const log = first ? '' : git('log', '--first-parent', '--format=%H%x1f%ad%x1f%s', '--date=short', range);
 const commits = log ? log.split('\n').map((l) => { const [sha, date, subject] = l.split('\x1f'); return { sha, date, subject }; }) : [];
-const quiet = !first && commits.length === 0;
+// --- the mail ---------------------------------------------------------------------------
+// Petitions arrive on nobody's commit schedule. A repository can go a month without a merge
+// and still be owed a reading, so an UNSEEN PETITION IS PART OF THE RANGE — it makes a quiet
+// subject a non-quiet session. Without that, the one thing a seat is asked to come looking
+// for would be the one thing it never reaches: the empty-range short circuit fires first.
+//
+// Fetched here, in the mechanical half, and written into the workspace. The agent never reads
+// the node — METHOD.md's refusal to widen scope is untouched, and the inbox is delivered to
+// the one directory it already reads.
+const inb = inbound(root);
+const fresh = unseen(inb.items, state.petitions || {});
+if (inb.address) {
+  fs.writeFileSync(path.join(work, 'PETITIONS.md'), render(inb, fresh));
+}
+
+// Quiet means nothing to say. New mail is something to say, whatever the subject did.
+const quiet = !first && commits.length === 0 && fresh.length === 0;
 
 fs.mkdirSync(path.join(work, 'sessions'), { recursive: true });
-fs.writeFileSync(statePath, JSON.stringify({ subject: head, ran: today, advocate: seat.name }, null, 2) + '\n');
+// The seen-set is recorded whether or not the seat acts on an item. Being SHOWN a petition is
+// what is tracked; what to do about it is judgement and belongs in COMPLAINTS/ASKS. Re-raising
+// an item the seat already declined would make declining impossible.
+fs.writeFileSync(statePath, JSON.stringify({
+  subject: head, ran: today, advocate: seat.name,
+  petitions: Object.fromEntries(inb.items.map((it) => [it.file, it.digest])),
+}, null, 2) + '\n');
 
 if (quiet) {
   fs.writeFileSync(path.join(work, 'sessions', `${today}.md`),
-    `# ${today}\n\nSubject unchanged at \`${head.slice(0, 7)}\`. Nothing merged since the last session; nothing to say.\n`);
+    `# ${today}\n\nSubject unchanged at \`${head.slice(0, 7)}\`. Nothing merged since the last session, and no petitions unread; nothing to say.\n`);
 }
 
 const out = {
   advocate: seat.name, branch: seat.branch, workspace: work,
   subject: head, since, range: first ? null : range, first, quiet, commits,
   writes: seat.writes, constitution: seat.constitution,
+  petitions: { address: inb.address, filed: inb.items.length, unread: fresh.length },
 };
 
 if (flags.includes('--json')) { console.log(JSON.stringify(out, null, 2)); }
@@ -143,8 +167,9 @@ else {
   console.log(`advocate ${seat.name} → ${seat.branch}`);
   console.log(`  workspace: ${out.workspace}`);
   console.log(first ? `  seated at ${head.slice(0, 7)} — no range yet; form an opening position`
-            : quiet ? `  quiet: subject unchanged at ${head.slice(0, 7)}`
-                    : `  ${commits.length} commit(s) since ${since.slice(0, 7)}`);
+            : quiet ? `  quiet: subject unchanged at ${head.slice(0, 7)}, no unread petitions`
+                    : `  ${commits.length} commit(s) since ${since ? since.slice(0, 7) : 'seating'}`);
+  if (inb.address) console.log(`  petitions: ${inb.address} — ${inb.items.length} filed, ${fresh.length} unread`);
   for (const c of commits.slice(0, 20)) console.log(`  ${c.sha.slice(0, 7)} ${c.date} ${c.subject}`);
 }
 process.exit(0);

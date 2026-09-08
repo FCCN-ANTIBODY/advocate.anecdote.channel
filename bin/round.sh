@@ -127,9 +127,13 @@ else
 
 Your workspace is $work and you work THERE and nowhere else. Read, in this order:
 
-1. $work/sessions/PENDING.md — your work order. It names the range.
+1. $work/sessions/PENDING.md — your work order. It names the range and any unread mail.
 2. $here/METHOD.md — the method. It is law, including its refusals. Follow it in order.
 3. $root/advocate.yml, the entry under \`$name\` — the only thing that says what to want.
+4. $work/PETITIONS.md, if it is there — concerns filed FOR this repository by someone not
+   standing in it. It was delivered into your workspace, so reading it is not widening scope;
+   following an item back to where it came from would be. Take only what falls in your
+   constituency, and say in your session note what you did with each unread item.
 
 Then do the session. Do not widen scope beyond $root. Report an unmeasurable goal as
 unmeasured. Never manufacture output because a schedule fired — an empty or thin range is a
