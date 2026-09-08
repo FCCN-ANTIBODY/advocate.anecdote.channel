@@ -20,6 +20,7 @@ You have this directory. There is nothing to install — no dependencies, on pur
 ```sh
 node bin/seats.mjs --seat upkeep      # read a config, with every default resolved
 node bin/session.mjs upkeep           # prepare a workspace and report what moved
+node bin/petitions.mjs                # what has been filed FOR this repository
 npm test                              # node test/*.test.mjs
 ```
 
@@ -170,6 +171,39 @@ picker; its cost is one manual step. It is opt-in for a mechanical reason: **Git
 repository until a first page exists**, so on a repo whose wiki was never opened there is no remote
 to push to. Open it once in the browser; after that it is only ever a push, and `publish.sh` says
 exactly this if you turn it on too early.
+
+## Petitions — a seat comes looking
+
+A **petition** is a concern filed *for* a repository by someone not standing in it. Filing is
+covered by [`PETITION.md`](PETITION.md); this is what the framework does with them.
+
+**A seat checks its mail as a step in its round** ([`METHOD.md`](METHOD.md) step 2b), and **an
+unread petition makes an otherwise quiet session non-quiet.** That second part is the whole
+mechanism: petitions arrive on nobody's commit schedule, so without it the empty-range short
+circuit would fire first and the one thing a seat is asked to come looking for would be the one
+thing it never reached.
+
+The mail is resolved in the **mechanical half** — before the agent wakes — and written into the
+advocate's workspace as `PETITIONS.md`. That is deliberate, and it is what keeps `METHOD.md`'s
+refusal to widen scope intact: the seat does not go anywhere to get its post, and following an item
+back to where it was filed is still forbidden.
+
+A seat takes only what falls in its constituency. Declining is a complete answer, and an item no
+seat can take is reported as outside every seat — which is a signal the repository may be missing
+one. Seating stays a person's act.
+
+**No petition space is the normal case.** Everything here returns empty rather than failing, so a
+repository mounting this framework without one is unaffected. The space is one operator's
+arrangement; the framework is the thing that travels.
+
+```sh
+STATION_NODE=/path/to/node node bin/petitions.mjs
+```
+
+A node declares the space in a library config file, and an item is addressed by **library path** —
+the same words a round already uses to name what it serves, so a repository that can be served can
+be petitioned and the two cannot disagree about its name. Addressing never requires the submodule
+to be hydrated: it resolves if the library knows the name.
 
 ## Anyone can advocate for you, and it costs you nothing
 

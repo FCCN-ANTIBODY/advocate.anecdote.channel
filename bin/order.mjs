@@ -24,6 +24,13 @@ const method = `${path.basename(engine || '.advocate-engine')}/METHOD.md`;
 const { workspace, ...order } = s;   // a local absolute path means nothing to the next reader
 const rows = s.commits.map((c) => `| \`${c.sha.slice(0, 7)}\` | ${c.date} | ${c.subject} |`).join('\n');
 
+// An order can be OWED ENTIRELY because of mail — a quiet subject with an unread petition is a
+// real session. Say so at the top, or the reader sees an empty range and assumes a mistake.
+const p = s.petitions || {};
+const mail = !p.address ? '_no petition space — nothing addressed here_'
+  : p.unread ? `**${p.unread} unread** of ${p.filed} filed for \`${p.address}\` — see \`PETITIONS.md\``
+  : `${p.filed} filed for \`${p.address}\`, none unread`;
+
 const body = `# Work order — ${name}
 
 **A session is due and no machine ran it.** Everything mechanical is already done: the branch is
@@ -32,7 +39,10 @@ needs judgement.
 
 - **Advocate:** \`${name}\`  ·  **Branch:** \`${s.branch}\`
 - **Subject commit:** \`${s.subject}\`
-- **Range:** ${s.first ? '_first session — no range yet; form an opening position_' : `\`${s.range}\``}
+- **Range:** ${s.first ? '_first session — no range yet; form an opening position_'
+  : s.commits.length === 0 ? '_nothing merged — this order is open for the mail alone_'
+  : `\`${s.range}\``}
+- **Mail:** ${mail}
 - **Opened:** ${new Date().toISOString().slice(0, 10)}
 
 ${s.first ? '' : `## What moved\n\n| commit | date | subject |\n| --- | --- | --- |\n${rows}\n`}
@@ -43,11 +53,15 @@ ${s.first ? '' : `## What moved\n\n| commit | date | subject |\n| --- | --- | --
    \`${name}\`. Read it. It is the only thing that says what to want.
 3. **You are already standing in your workspace.** \`POSITION.md\`, \`COMPLAINTS.md\` and
    \`ASKS.md\` are here, carried forward from last time. Rewrite \`POSITION.md\` whole; carry the
-   other two forward with your edits.
-4. Write \`sessions/${new Date().toISOString().slice(0, 10)}.md\` — the range, what changed, and
-   what you deliberately did **not** say.
-5. **Delete this file.** An order left behind reads as a session still owed.
-6. Commit on this branch and push. Never merge it into \`main\`.
+   other two forward with your edits.${p.address ? `
+4. **Read \`PETITIONS.md\`** — concerns filed for this repository by someone not standing in it.
+   It was delivered to you; reading it is not widening scope, and following an item back to where
+   it came from is. Take only what falls in your constituency, and say in your session note what
+   you did with each unread item. Declining is a complete answer.` : ''}
+${p.address ? '5' : '4'}. Write \`sessions/${new Date().toISOString().slice(0, 10)}.md\` — the range, what changed, what
+   you did with each unread petition, and what you deliberately did **not** say.
+${p.address ? '6' : '5'}. **Delete this file.** An order left behind reads as a session still owed.
+${p.address ? '7' : '6'}. Commit on this branch and push. Never merge it into \`main\`.
 
 <!-- machine-readable; bin/pending.mjs reads the block below -->
 \`\`\`json
