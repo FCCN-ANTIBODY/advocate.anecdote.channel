@@ -1,89 +1,72 @@
-A seat checks its mail: petitions arrive as a step in the round
+A seat's workspace must start from origin when origin is ahead
 
-Petitions could be filed but nothing made anyone read them. A seat now checks what has been filed
-for its repository as part of its session, and **doing that is the sign of life** — the thing that
-distinguishes a seat that is held from a schedule that fires.
+`bin/session.mjs` preferred the **local** `advocate/<seat>` ref whenever one existed, falling
+back to `origin/<seat>` only if there was no local branch at all. That is wrong in the one case
+that actually happens on a machine running rounds: **something else pushed to the seat's
+branch.**
 
-## The load-bearing change is the quiet rule
+A work order opened from CI is exactly that. It lands on `origin/advocate/<seat>` and never
+touches the local ref. `round.sh` does `git fetch --all --prune`, which updates `origin/*` and
+nothing else — so the next session starts from the stale local tip, never sees the order, writes
+a session on top, and the push is rejected non-fast-forward.
 
-`METHOD.md` says an empty range ends the session, and it should — an advocate that manufactures
-opinion because a schedule fired is the failure the whole design guards against.
+**Nothing recovers from this on its own.** Every round afterwards repeats it and throws its own
+work away, and the only trace is one line of `mechanical half failed` in the council log.
 
-But **petitions arrive on nobody's commit schedule.** A repository can go a month without a merge
-and still be owed a reading. Left alone, the empty-range short circuit fires first and the one thing
-a seat is asked to come looking for is the one thing it never reaches.
+## What it has already cost, on this machine
 
-So: **an unread petition is part of the range.** A quiet subject with new mail is a non-quiet
-session. Everything else here is plumbing for that sentence.
+Seven seats across three repositories, every one of them holding a remote-only commit dated
+**2026-09-07** reading `<seat>: 1 commit(s) to read — work order open for a local session`:
 
-## Scope is not widened — the mail is delivered
+| repository | seats | rounds lost | stranded locally |
+|---|---|---|---|
+| `NCCV-OPINION/cite-fort-collins` | `custody`, `contributor`, `one-operator` | 7, 7, 6 | quiet sessions |
+| `FCCN-ANTIBODY/constellation.anecdote.channel` | `addressing`, `consent`, `presentation` | 6 each | `addressing` 5 drafts, `consent` 2 drafts |
+| `Chaevity/ablative` | `console` | 7 | two sessions of 6 drafts each |
 
-`METHOD.md` forbids reading a repository that is not in the checkout, and that refusal is most of
-what keeps a seat narrow. It is untouched.
+45 rejected pushes in `~/.advocate/council.log`. The content lost is mostly `quiet session` —
+but the **work orders from 2026-09-07 have gone unread for six days**, which is the real harm:
+the cloud side asked for a local session seven times and the local side could not hear it.
 
-`bin/petitions.mjs` runs in the **mechanical half**, before the agent wakes, and writes
-`PETITIONS.md` into the workspace the seat already reads. The seat does not go anywhere to get its
-post. Following an item back to where it was filed is still forbidden, and is now named in the
-refusal list explicitly.
+## The rule this puts in
 
-## What a seat may do with an item
+When both refs exist, the tip that **contains** the other wins:
 
-**A petition addressed to the repository is not automatically the seat's.** For each unread item,
-exactly one of: take it into `COMPLAINTS.md`/`ASKS.md` as a draft; say it belongs to another seat;
-or flag it as nobody's. All three are complete answers and all three go in the session note.
+- remote contains local (behind, or identical) → start from `origin/<branch>`. The remote is the
+  shared record.
+- local contains remote (ahead) → start from the local branch. That is the ordinary state of a
+  machine whose last push was disabled or offline, and its unpushed sessions must not be dropped.
+- neither contains the other (genuinely diverged) → **refuse and say so.** It cannot be resolved
+  here without discarding somebody's session, and one loud failure that names its own fix beats a
+  silent one that repeats forever. `round.sh` already treats a nonzero exit from the mechanical
+  half as a skipped seat, so this needs nothing on that side.
 
-Declining is free. **Silence is not** — an unread petition that goes unmentioned is the failure
-the step exists to prevent.
+Only one ref, or neither: unchanged.
 
-An item no seat can take gets reported as outside every seat. That is a signal the repository may be
-missing one, and seating stays a person's act — `METHOD.md`'s "you never propose a new seat" is not
-suspended by this, and the new step says so.
+## The recovery it prints, and why it is four lines
 
-## Addressing
-
-An item is addressed by **library path** (`FCCN-ANTIBODY/civic-node`), resolved from a node's
-`library/PETITIONS.yml`. A repository never declares its own address — it is discovered by matching
-origin against what the library already points at, so there is nothing per-repo to configure and
-nothing to keep true in two places. That was the "feels a little heavy" concern: no petitioner seat
-anywhere, no config in any subject repository.
-
-**Addressing never requires hydration.** Aliases resolve from `.gitmodules`, not by reading the
-mount — otherwise a repository would go unaddressable exactly when the node had not fetched it,
-which is backwards. There is a test for it against a deliberately absent mount.
-
-**No petition space is the normal case.** Every path returns empty rather than failing: no node, a
-node with no config, a malformed config, or a repository the library has no name for. The framework
-is the thing that travels; the node is one operator's arrangement.
+The obvious advice — `git -C <root> rebase origin/<b> <b>` — **checks the seat branch out in the
+root worktree and leaves it there**, parking the repository on an advocate branch. Several
+appliances here commit on a schedule to whatever branch is checked out, so that is a real hazard
+and not a tidiness point. The message uses a throwaway worktree instead.
 
 ## Verified
 
-`npm test` green, including `test/petitions.test.mjs` (new, wired into the suite). The test that
-matters walks the real sequence: seat → quiet second run → **new petition with no commits opens a
-work order**. Also covered: ssh/https URL parity, alias resolution without hydration, unaddressable
-repos, absent and malformed configs, and content-digest read tracking (an edited petition is news
-again; a merely touched one is not).
+A sandbox repo (bare origin, a working clone, a third clone standing in for CI) driving
+`bin/session.mjs` directly:
 
-End-to-end against a scratch repo through the real `run.sh` — the order reads
-*"nothing merged — this order is open for the mail alone."*
+- **against `origin/main`'s copy** — the work order is *not* visible in the workspace and the
+  session's push is rejected non-fast-forward. The bug, reproduced.
+- **against this branch** — behind: the workspace contains `ORDER.md`. Ahead: the unpushed
+  session survives. Diverged: exit 1 with the reconcile command.
 
-## Two fixes found on the way
+`node --check` passes; `npm test` covers `yaml-enough`, `seats`, `adapter` and `petitions` and is
+untouched by this.
 
-- **`norm()` stripped `.git` before the trailing slash**, so `…/repo.git/` kept a `.git` nobody
-  else would have. The runner's sed in `station-node` has the same ordering; parity between them is
-  the invariant (a repository that can be served must be reachable), so that one is fixed on the
-  matching `station-node` PR.
-- **The `import.meta.url === file://${argv[1]}` main-module check fails behind a symlink.** On macOS
-  `/tmp` is `/private/tmp`, so the CLI silently did nothing. Compared through `realpath` now.
+## Not done here, and it needs a decision
 
-## Deliberately not done
-
-- **No seat has read anything yet.** This makes the mail arrive; the backlog is still all `draft`.
-- **`writes:` is untouched.** Adopting a petition is a seat writing on its own branch, which is what
-  it could already do. No new grant, no pull request from a petition.
-- **Nothing writes back to the space.** Clearing an item is a person's act at triage. A seat that
-  could delete its own mail is a shape worth refusing.
-
-## Depends on
-
-`tiliv/station-node#1` for the space itself. This is safe to merge first and does nothing until a
-node exists — which is the intended resting state for any repository without one.
+**The seven diverged branches are still diverged.** This stops it happening again; it does not
+reconcile what already happened. Each needs the four-line recovery run once, which pushes 6–9
+local session commits to branches that have never seen them. That is a push to three
+repositories' seat branches and I did not want to do it unasked — say the word and it is
+mechanical.

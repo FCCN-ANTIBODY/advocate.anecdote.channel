@@ -90,8 +90,30 @@ for (const block of (gitQuiet('worktree', 'list', '--porcelain') || '').split('\
 }
 execFileSync('git', ['worktree', 'prune'], { stdio: 'ignore' });
 
-const exists = gitQuiet('rev-parse', '--verify', `refs/heads/${seat.branch}`)
-  || gitQuiet('rev-parse', '--verify', `refs/remotes/origin/${seat.branch}`);
+const localTip  = gitQuiet('rev-parse', '--verify', `refs/heads/${seat.branch}`);
+const remoteTip = gitQuiet('rev-parse', '--verify', `refs/remotes/origin/${seat.branch}`);
+const exists = localTip || remoteTip;
+
+// WHICH TIP THE WORKSPACE STARTS FROM, WHEN BOTH EXIST.
+//
+// Preferring the local branch unconditionally is what this used to do, and it is wrong in the
+// one case that actually happens: something else pushed to the seat's branch. A work order
+// opened from CI is exactly that, and it lands on `origin/<branch>` without ever touching the
+// local ref. The round's `git fetch --all` updates `origin/*` and nothing else, so the next
+// session starts from the stale local tip, writes on top of it, and the push is rejected
+// non-fast-forward. Nothing recovers on its own: every round after it repeats the whole thing
+// and throws its own work away, and the only trace is one line of `mechanical half failed`.
+//
+// So: the remote is the shared record and wins whenever it CONTAINS the local tip. The local
+// branch wins when it contains the remote — the ordinary state of a machine whose last push
+// was disabled or offline, where its own unpushed sessions must not be discarded.
+const startFrom = () => {
+  if (!(localTip && remoteTip)) return localTip ? seat.branch : `origin/${seat.branch}`;
+  const contains = (a, b) => gitQuiet('merge-base', '--is-ancestor', a, b) !== null;
+  if (contains(localTip, remoteTip)) return `origin/${seat.branch}`;  // behind, or identical
+  if (contains(remoteTip, localTip)) return seat.branch;              // ahead: unpushed sessions
+  return null;                                                        // genuinely diverged
+};
 
 // --force, because a workspace is DISPOSABLE and the branch is the durable thing. Without it,
 // a worktree registered at any other path still holding this branch — a leftover from an
@@ -100,8 +122,24 @@ const exists = gitQuiet('rev-parse', '--verify', `refs/heads/${seat.branch}`)
 // hand. Anything uncommitted in such a leftover is by definition a session that already
 // failed; the branch it was cut from is untouched, and that is what is being re-checked-out.
 if (exists) {
-  const start = gitQuiet('rev-parse', '--verify', `refs/heads/${seat.branch}`)
-    ? seat.branch : `origin/${seat.branch}`;
+  const start = startFrom();
+  // REFUSE RATHER THAN CHOOSE. A diverged seat branch cannot be resolved here without
+  // discarding one side, and both sides are somebody's session. Stopping turns a silent
+  // failure that repeats forever into one loud one that names its own fix.
+  if (start === null) {
+    console.error(`advocate: ${seat.branch} has diverged from origin/${seat.branch} — refusing to run`);
+    console.error(`advocate: local ${localTip.slice(0, 8)} and remote ${remoteTip.slice(0, 8)} each hold commits the other does not.`);
+    // Reconcile in a THROWAWAY WORKTREE, never in the root. `git rebase origin/<b> <b>` run at
+    // the top level checks the seat branch out there and leaves it checked out — parking the
+    // repository on an advocate branch, which is the one place it must never sit.
+    const fix = `/tmp/advocate-${path.basename(root)}-${name}`;
+    console.error(`advocate: reconcile it once, by hand, then the seat runs again:`);
+    console.error(`advocate:   git -C ${root} worktree add --force ${fix} ${seat.branch} \\`);
+    console.error(`advocate:     && git -C ${fix} rebase origin/${seat.branch} \\`);
+    console.error(`advocate:     && git -C ${fix} push origin HEAD:refs/heads/${seat.branch} \\`);
+    console.error(`advocate:     && git -C ${root} worktree remove --force ${fix}`);
+    process.exit(1);
+  }
   git('worktree', 'add', '--quiet', '--force', '-B', seat.branch, work, start);
 } else {
   // First run: an orphan, so the workspace carries none of main's tree or history.
